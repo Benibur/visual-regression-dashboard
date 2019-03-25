@@ -92,7 +92,7 @@ d c<template>
     <comparison-modal :src="modalSrc" :srcActual="selectedSrcActual" :srcExpected="selectedSrcExpected" :matching="selectedMatchingResult" :bg="modalBgSrc"></comparison-modal>
 
     <mask-modal :src="modalSrc" :srcActual="selectedSrcActual" :srcExpected="selectedSrcExpected"
-      :matching="selectedMatchingResult" :bg="modalBgSrc">
+      :matching="selectedMatchingResult" :bg="modalBgSrc" :hasMask="hasMask">
     </mask-modal>
 
   </div>
@@ -130,31 +130,32 @@ function getSearchParams() {
 export default {
   name: 'App',
   components: {
-    'capture-modal': CaptureModal,
+    'capture-modal'   : CaptureModal,
     'comparison-modal': ComparisonModal,
-    'mask-modal': MaskModal,
-    'item-summaries': ItemSummaries,
-    'item-details': ItemDetails,
+    'mask-modal'      : MaskModal,
+    'item-summaries'  : ItemSummaries,
+    'item-details'    : ItemDetails,
   },
   data: () => ({
-    actualDir: window['__reg__'].actualDir,
-    testId: window['__reg__'].testId,
-    expectedDir: window['__reg__'].expectedDir,
-    diffDir: window['__reg__'].diffDir,
-    search: getSearchParams(),
-    modalSrc: "",
-    modalBgSrc: null,
-    isModalOpen: false,
-    failedItems: searchItems('failedItems', getSearchParams()),
-    passedItems: searchItems('passedItems', getSearchParams()),
-    newItems: searchItems('newItems', getSearchParams()),
-    deletedItems: searchItems('deletedItems', getSearchParams()),
-    lastRequestSequence: null,
-    selectedRaw: "",
-    selectedSrcActual: "",
-    selectedSrcExpected: "",
-    selectedMatchingResult: null,
-    someVariableUnderYourControl: 1,
+    actualDir   : window['__reg__'].actualDir                    ,
+    testId      : window['__reg__'].testId                       ,
+    expectedDir : window['__reg__'].expectedDir                  ,
+    diffDir     : window['__reg__'].diffDir                      ,
+    search      : getSearchParams()                              ,
+    modalSrc    : ""                                             ,
+    hasMask     : ""                                             ,
+    modalBgSrc  : null                                           ,
+    isModalOpen : false                                          ,
+    failedItems : searchItems('failedItems', getSearchParams())  ,
+    passedItems : searchItems('passedItems', getSearchParams())  ,
+    newItems    : searchItems('newItems', getSearchParams())     ,
+    deletedItems: searchItems('deletedItems', getSearchParams()) ,
+    lastRequestSequence          : null                          ,
+    selectedRaw                  : ""                            ,
+    selectedSrcActual            : ""                            ,
+    selectedSrcExpected          : ""                            ,
+    selectedMatchingResult       : null                          ,
+    someVariableUnderYourControl : 1                             ,
   }),
   created: function () {
     workerClient.subscribe(data => {
@@ -171,23 +172,23 @@ export default {
         this.deletedItems.length === 0;
     },
   },
-  // mounted: function () {
-  //   setTimeout(
-  //     ()=> this.openMask('sample.2.should_be_2_but_1_in_before.png') // TODO remove
-  //     , 10
-  //   )
-  // },
+  mounted: function () {
+    setTimeout(
+      ()=> this.openMask('sample.2.should_be_2_but_1_in_before.png', true) // TODO remove
+      , 10
+    )
+  },
   methods: {
     openCapture(src, bg) {
-      this.modalSrc = src;
-      this.modalBgSrc = bg;
-      this.isModalOpen = true;
+      this.modalSrc    = src
+      this.modalBgSrc  = bg
+      this.isModalOpen = true
       this.$modal.push('capture')
     },
 
     openComparison(src) {
       this.modalSrc = src;
-      this.selectedSrcActual = path.join(this.actualDir || '', src || '');
+      this.selectedSrcActual   = path.join(this.actualDir   || '', src || '');
       this.selectedSrcExpected = path.join(this.expectedDir || '', src || '');
       this.lastRequestSequence = workerClient.requestCalc({
         raw: src,
@@ -198,11 +199,11 @@ export default {
       this.$modal.push('comparison')
     },
 
-    openMask(src) {
-      this.modalSrc = src;
-      this.selectedSrcActual = path.join(this.actualDir || '', src || '');
+    openMask(src, hasMask) {
+      this.modalSrc = src
+      this.hasMask  = hasMask
+      this.selectedSrcActual   = path.join(this.actualDir   || '', src || '');
       this.selectedSrcExpected = path.join(this.expectedDir || '', src || '');
-      console.log(src, 'dddggg');
       this.isModalOpen = true;
       this.$modal.push('mask')
     },

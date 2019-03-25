@@ -24,8 +24,8 @@
             </button>
           </div>
           <div class="ui buttons">
-            <button class="ui button" v-on:click.self="closeModal">Cancel</button>
-            <button class="ui positive button">Save</button>
+            <button class="ui button" v-on:click="closeModal">Cancel</button>
+            <button class="ui positive button" v-on:click="saveMask">Save</button>
           </div>
         </div>
       </div>
@@ -36,10 +36,11 @@
 <script>
 
 import {fabric} from 'fabric'
+import path     from 'path'
 
 export default {
   name: 'MaskModal',
-  props: ['srcActual', 'srcExpected', 'matching'],
+  props: ['srcActual', 'srcExpected', 'matching', 'hasMask' ],
   components: {},
   data: function() {
     return {}
@@ -70,12 +71,17 @@ export default {
     reInitCanvas: function (src) {
       console.log('before initCanvas', src );
       this.$refs.mod.focus()
-      initCanvas(this.srcActual)
+      initCanvas(this.srcActual, this.hasMask)
     },
     keyCtrler:function (event) {
       console.log(event.key), event.keycode;
       if(event.key === 'Delete'){
         this.deleteSelectedMask()
+      }else if (event.key === 'Escape') {
+        // this.unSelectedMask()
+        console.log('discardActiveObject');
+        canvasF.discardActiveObject()
+        canvasF.requestRenderAll()
       }
     },
     deleteSelectedMask:function () {
@@ -85,6 +91,11 @@ export default {
       }
       canvasF.discardActiveObject()
       canvasF.requestRenderAll()
+    },
+    saveMask:function () {
+      console.log('saveMaks');
+      // console.log('saveMaks');
+      sendMaskToServer(this.srcActual)
     },
     zoomIn:function () {
       console.log('zoomIn');
@@ -117,14 +128,17 @@ var canvasF
 //   canvasF.remove(canvasF.getActiveObject())
 // }
 
-const initCanvas = (url) => {
+const initCanvas = (url, hasMask) => {
   console.log('initCanvas', url);
+  console.log('hasMask:', hasMask);
+  if (hasMask) {
+    getMask(url)
+  }
   // Globals for drag management
   var lastDownOutOfAMask, origX, origY, newRect
   lastDownOutOfAMask = true
   fabric.Object.prototype.transparentCorners = true
   fabric.Object.prototype.cornerStyle = 'circle'
-  // fabric.Object.prototype.uniScaleTransform = true
   resizeHtmlCanvas()
   canvasF = new fabric.Canvas('canvas',{
     backgroundColor: 'rgb(100,100,100)',
@@ -134,34 +148,16 @@ const initCanvas = (url) => {
   fabric.Image.fromURL(url, (oImg)=>{
     console.log('onload image');
     console.log(oImg)
-    oImg.selectable = false
+    oImg.selectable        = false
+    oImg.excludeFromExport = true
     canvasF.add(oImg)
     oImg.sendToBack()
   })
-  var rest1 = new fabric.Rect({
-      top    : 100  ,
-      left   : 100  ,
-      width  : 60   ,
-      height : 70   ,
-      fill   : 'red',
-      selectable:true
-  });
-  canvasF.add(rest1);
-
-  var rect2 = new fabric.Rect({
-      top        : 200    ,
-      left       : 100    ,
-      width      : 60     ,
-      height     : 70     ,
-      fill       : 'blue' ,
-      selectable : true   ,
-  });
-  canvasF.add(rect2);
 
   // Track mouse down coordonnates
   canvasF.on('mouse:down', function(o){
     console.log('mouse:down - target', o.target);
-    if (o.target.selectable) return // test if the click is inside a mask, if yes, exit
+    if (o.target.type === 'rect') return // test if the click is inside a mask, if yes, exit
     lastDownOutOfAMask = true;
     var pointer = canvasF.getPointer(o.e);
     origX = pointer.x;
@@ -171,7 +167,11 @@ const initCanvas = (url) => {
   // track mouse up to create a mask
   canvasF.on('mouse:up', function(o){
     console.log('mouse:up - lastDownOutOfAMask', lastDownOutOfAMask);
-    if (!lastDownOutOfAMask) return // check the mousedown occured outOf a mask
+    if (!lastDownOutOfAMask) {
+      canvasF.discardActiveObject()
+      canvasF.requestRenderAll()
+      return
+    } // check the mousedown occured outOf a mask
     lastDownOutOfAMask = false;
     var pointer = canvasF.getPointer(o.e);
     let width  = pointer.x-origX
@@ -210,6 +210,35 @@ const resizeHtmlCanvas = function () {
   can.width = document.documentElement.clientWidth - 80
   can.height = document.documentElement.clientHeight - 100
 }
+
+const getMask = function (url) {
+  const xhr = new XMLHttpRequest()
+  xhr.onreadystatechange = function(event) {
+    if (this.readyState === XMLHttpRequest.DONE) {
+        if (this.status === 200) {
+            // console.log("Réponse de getMask reçue: %s", this.responseText);
+            canvasF.loadFromJSON(this.responseText)
+        } else {
+            console.log("Status de getMask la réponse: %d (%s)", this.status, this.statusText);
+        }
+    }
+};
+  xhr.open('GET', 'mask/'+path.basename(url), true)
+  xhr.send(null)
+}
+
+const sendMaskToServer = function (url) {
+  const xhr = new XMLHttpRequest()
+  xhr.open('POST', 'mask/save/'+url, true)
+  xhr.setRequestHeader('Content-type','application/json');
+  let data = canvasF.toJSON()
+  console.log(data);
+  var blob = new Blob([JSON.stringify(data, null, 2)], {type : 'application/json'});
+  xhr.send(blob)
+}
+
+
+
 
 </script>
 

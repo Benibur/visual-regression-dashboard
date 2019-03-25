@@ -7,6 +7,7 @@ const watch           = require('node-watch'        )
 const fs              = require('fs'                )
 const Promise         = require('bluebird'          )
 const visualCompare   = require('./reg-cli/main.js' )
+const bodyParser      = require('body-parser'       )
 
 
 /*************************************************************/
@@ -62,6 +63,31 @@ app.post('/tests/:testId/set-as-reference/:filename', function(req, res) {
 
 
 /*************************************************************/
+/* ROUTE to SAVE a MASK                                      */
+app.use(bodyParser.json())
+app.post('/tests/:testId/mask/save/:dir/:filename', function(req, res) {
+  console.log('route for mask/save/ of app',  req.params.testId, '/', req.params.filename);
+  const maskPath = 'public/' + req.params.testId + '/mask/'
+  checkAndCreateDir(maskPath)
+  fs.writeFileSync(maskPath + req.params.filename + '.json', JSON.stringify(req.body, null, 2))
+  // update the comparison
+  scanTest('public/' + req.params.testId , true)
+  .then(()=> res.send(true) )
+});
+
+
+/*************************************************************/
+/* ROUTE to GET a MASK                                      */
+app.get('/tests/:testId/mask/:filename', function(req, res) {
+  console.log('route to get mask of app',  req.params.testId, '/mask/', req.params.filename);
+  const maskPath = 'public/' + req.params.testId + '/mask/'
+  // checkAndCreateDir(maskPath)
+  const json = fs.readFileSync(maskPath + req.params.filename + '.json', 'utf8')
+  res.send(json)
+});
+
+
+/*************************************************************/
 /* BROWSER RELOADER                                          */
 reloadBrowser = reload(app)
 
@@ -101,9 +127,7 @@ watch("./src-server/report/dist",{ recursive: false}, function (evt, name) {
 /*************************************************************/
 /* INITIAL SCAN of tests folders                             */
 function scanTests() {
-  const directoryPath =  'public'
-  const fileNames = fs.readdirSync(directoryPath)
-  console.log('');
+  const fileNames = fs.readdirSync('public')
   return Promise.map(fileNames, file => scanTest('public/'+file), {concurrency:4}) //
 }
 
@@ -165,3 +189,12 @@ scanTests().then(()=>{
   console.log('all promises fullfiled');
   reloadBrowser.reload(); // Fire server-side reload event when all the scans are done.
 })
+
+
+/*************************************************************/
+/* HELPERS          */
+function checkAndCreateDir(path) {
+  if (!fs.existsSync(path)) {
+    fs.mkdirSync(path)
+  }
+}

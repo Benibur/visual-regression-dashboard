@@ -6,14 +6,15 @@
             </a>
             <div class="captures">
                 <div v-if="diffDir" class="capture" v-on:click="openCapture(createSrc(diffDir, item.encoded), createSrc(actualDir, item.encoded))">
-                    <capture-image :src="createSrc(diffDir, item.encoded)" :kind="'Diff'"></capture-image>
+                    <capture-image :kind="'Diff'" :src="createSrc(diffDir, item.encoded)" :hasMask="item.hasMask" :file="item.encoded" ></capture-image>
+
                 </div>
                 <div v-if="actualDir" class="capture" v-on:click="open(item.encoded, actualDir)">
-                    <capture-image :src="createSrc(actualDir, item.encoded)" :kind="'After'" :shouldDisplaySetAsRef="test()"
-                    :file="item.encoded" :setImageAsReference="setImageAsReference" :openMask="openMask"></capture-image>
+                    <capture-image :kind="'After'" :src="createSrc(actualDir, item.encoded)" :shouldDisplaySetAsRef="test()"
+                      :file="item.encoded" :setImageAsReference="setImageAsReference" :openMask="openMask" :hasMask="item.hasMask" ></capture-image>
                 </div>
                 <div v-if="expectedDir" class="capture" v-on:click="open(item.encoded, expectedDir)">
-                    <capture-image :src="createSrc(expectedDir, item.encoded)" :kind="'Before'"></capture-image>
+                    <capture-image :kind="'Before'" :src="createSrc(expectedDir, item.encoded)" :hasMask="item.hasMask" :file="item.encoded"></capture-image>
                 </div>
             </div>
         </div>

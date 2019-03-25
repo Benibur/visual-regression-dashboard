@@ -101,3 +101,9 @@ yarn test:init
 #  repeat as many times as you want :-)
 
 ```
+
+### TODO
+* route pour uploader des images
+* route pour uploader les metat data d'un runId
+* route pour récupérer le status d'un run ()
+* route pour supprimer les run de PR.

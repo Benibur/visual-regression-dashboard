@@ -19,6 +19,7 @@
   "dependencies": {
     "babel-loader": "7.1.5",
     "bluebird": "^3.5.3",
+    "body-parser": "^1.18.3",
     "colors": "^1.1.2",
     "commander": "~2.3",
     "del": "^4.0.0",

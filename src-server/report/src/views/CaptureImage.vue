@@ -6,7 +6,7 @@
         <button v-if="shouldDisplaySetAsRef" class="ui green mini right labeled icon button" v-on:click.stop="()=>setImageAsReference(file)">Validate as new target
           <i class="right download icon"></i>
         </button>
-        <button v-if="openMask" class="ui blue mini right labeled icon button" v-on:click.stop="()=>openMask(file)">Masks
+        <button v-if="openMask" class="ui blue mini right labeled icon button" v-on:click.stop="()=>openMask(file, hasMask)">Masks
           <i class="right adjust icon"></i>
         </button>
       </div>
@@ -20,7 +20,7 @@
 <script>
 export default {
   name: 'CaptureImage',
-  props: ['kind', 'src', 'shouldDisplaySetAsRef', 'file', 'setImageAsReference', 'openMask'],
+  props: ['kind', 'src', 'shouldDisplaySetAsRef', 'file', 'setImageAsReference', 'openMask', 'hasMask'],
   // methods:{
   //   setImageAsReference: function() {
   //     console.log('setImageAsReference',this.file);
