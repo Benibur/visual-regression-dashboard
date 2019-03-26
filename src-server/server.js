@@ -135,10 +135,10 @@ function scanTests() {
 /*************************************************************/
 /* SCAN A DIRECTORY and compare images to produce reports    */
 function scanTest(dirPath, force) {
+  console.log('\nscan', dirPath);
   var path = dirPath+'/comparison-description.json'
   var comparisonDescription = {}
   var testDescription
-  console.log('\nscan', dirPath);
   if (fs.existsSync(path)) {
     comparisonDescription = JSON.parse(fs.readFileSync(path, 'utf8'))
   }
@@ -148,6 +148,7 @@ function scanTest(dirPath, force) {
   if ((comparisonDescription.runId != testDescription.runId) || force) {
     console.log('visual Comparison required for', dirPath, testDescription.runId)
     scanInProgress++
+    updateMasked(dirPath)
     var promise = visualCompare(dirPath, testDescription.runId, testDescription.testId)
     promise.then((result)=>{
         comparisonDescription.isError = result.isError
@@ -165,6 +166,18 @@ function scanTest(dirPath, force) {
     console.log('à la fin du scan (sans scan...), testDescription.isError ', testDescription.isError);
     return comparisonDescription // TODO : not sure that that we should return a resolved promise instead of a value...
   }
+}
+
+
+/*************************************************************/
+/*  */
+function updateMasked(dirPath) {
+  var pngDir = 'after'
+  // for (var f of fs.) {
+  //
+  // }
+  // pngDir = 'before'
+
 }
 
 

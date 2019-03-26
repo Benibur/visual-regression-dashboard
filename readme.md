@@ -107,3 +107,6 @@ yarn test:init
 * route pour uploader les metat data d'un runId
 * route pour récupérer le status d'un run ()
 * route pour supprimer les run de PR.
+
+### Credits
+* this code has been heavily re using reg-cli : https://github.com/reg-viz/reg-cli
