@@ -23,7 +23,7 @@
 <script>
 export default {
   name: 'CaptureImage',
-  props: ['kind', 'src', 'shouldDisplaySetAsRef', 'file', 'setImageAsReference', 'openMask', 'hasMask', 'canDeleteItem' ],
+  props: ['kind', 'src', 'shouldDisplaySetAsRef', 'file', 'setImageAsReference', 'openMask', 'hasMask', 'canDeleteItem', 'deleteItem' ],
   // methods:{
   //   setImageAsReference: function() {
   //     console.log('setImageAsReference',this.file);

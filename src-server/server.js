@@ -58,7 +58,8 @@ app.post('/api/:projectId/:suiteId/:prId/set-as-reference/:filename', function(r
   catch (e) {}
   finally {
     console.log('file moved, re-scan the suite on all PRs'); // TODO we should rescan the whole suite, not only the current pr ! ! a queue would be better.
-    scanTest(p.projectId, p.suiteId, p.prId, true)           // update the comparison TODO : delay in the case where a scan is in progress
+    scanSuite(p.projectId, p.suiteId, true)           // update the comparison TODO : delay in the case where a scan is in progress
+    scanPr(p.projectId, p.suiteId, p.prId, true)           // update the comparison TODO : delay in the case where a scan is in progress
     .then(()=>{
       res.send(true)
     })
@@ -72,9 +73,9 @@ app.post('/api/:projectId/:suiteId/:prId/refresh', function(req, res) {
   const p = req.params
   console.log('route for refresh comparison :',  `public/${p.projectId}-${p.suiteId}/${p.prId}`);
   // update the comparison
-  scanTest(p.projectId, p.suiteId, p.prId, true)           // update the comparison TODO : delay in the case where a scan is in progress
-  .then(()=>{
-    res.send(true)
+  scanPr(p.projectId, p.suiteId, p.prId, true)           // update the comparison TODO : delay in the case where a scan is in progress
+  .then((comparison)=>{
+    res.send(comparison)
   })
 });
 
@@ -88,7 +89,7 @@ app.post('/tests/:testId/mask/save/:dir/:filename', function(req, res) {
   checkAndCreateDir(maskPath)
   fs.writeFileSync(maskPath + req.params.filename + '.json', JSON.stringify(req.body, null, 2))
   // update the comparison
-  scanTest('public/' + req.params.testId , true)
+  scanPr('public/' + req.params.testId , true)
   .then(()=> res.send(true) )
 });
 
@@ -124,7 +125,7 @@ watchDashboard.on('all', function (evt, filepath) {
 /* RELOAD of web page when the description of a test changes */
 // const watc
 // watch("./public",{ recursive: true, filter: /test\-description\.json$/}, function (evt, name) {
-//     scanTest(path.dirname(name))
+//     scanPr(path.dirname(name))
 //     .then(()=>{
 //       console.log('ask browser reload !');
 //       reloadBrowser.reload(); // Fire server-side reload evenht TODO : be more specific than reloading the full web page
@@ -137,7 +138,7 @@ watchDashboard.on('all', function (evt, filepath) {
 const watchReport = new Watch('./src-server/report/dist/build.js')
 watchReport.on('all', function (evt, filepath) {
     console.log('Report has changed, run all scans and ask browser reload');
-    scanTests()
+    scanAllProjects()
     .then(()=>{
       console.log('reports rescanned, let\'s refresh');
       reloadBrowser.reload(); // Fire server-side reload evenht TODO : be more specific than reloading the full web page
@@ -147,7 +148,7 @@ watchReport.on('all', function (evt, filepath) {
 
 /*************************************************************/
 /* INITIAL SCAN of tests folders                             */
-function scanTests() {
+function scanAllProjects() {
   const fileNames = fs.readdirSync('public')
   const prDirectories = glob.sync('public/*/pr-*')
   return Promise.map(prDirectories, dir => {
@@ -156,53 +157,66 @@ function scanTests() {
     const project = match[0]
     const suite   = match[1]
     const prId    = dir[2] // TODO : parseInt ?
-    // console.log('\nscanTests', project, suite, prId)
-    return scanTest(project, suite, prId, false)
+    // console.log('\nscanAllProjects', project, suite, prId)
+    return scanPr(project, suite, prId, false)
   }, {concurrency:4})
 }
 
 
 /*************************************************************/
+/* SCAN ALL THE PRs OF A SUITE                               */
+function scanSuite(projectId, suiteId, force){
+  const prIds = (comparisonsDictionnary[projectId] || {})[suiteId]
+  if (!prIds) return
+  for (var prId in prIds) {
+    scanPr(projectId, suiteId, prId, force)
+  }
+}
+
+
+/*************************************************************/
 /* SCAN A DIRECTORY and compare images to produce reports    */
-function scanTest(project, suite, prId, force) {
+function scanPr(project, suite, prId, force) {
   const prPath   = `public/${project}-${suite}/${prId}/`
   const compPath = `public/${project}-${suite}/${prId}/comparison-description.json`
   var   comparison = {}
   var   test
   console.log('\nSCAN', prPath);
-  if (fs.existsSync(compPath)) {
+  if (!force && fs.existsSync(compPath)) {
     console.log('comparison-description.json loaded');
     comparison = JSON.parse(fs.readFileSync(compPath, 'utf8'))
   }
   suiteDescription = JSON.parse(fs.readFileSync(`public/${project}-${suite}/suite-description.json`, 'utf8'))
   // check if the comparison has already been done (test and comparison must have the same beforeVersion)
   // if not, then run a comparison
-  if ((comparison.beforeVersion != suiteDescription.beforeVersion) || force) {
+  if (force || (comparison.beforeVersion != suiteDescription.beforeVersion) ) {
     console.log(`Visual Comparison required for ${project}/${suite}/${prId} - ${suiteDescription.beforeVersion}, ${comparison.beforeVersion}`)
     scanInProgress++
     // updateMasked(dirPath)
-    var promise = visualCompare(project, suite, prId, suiteDescription.beforeVersion)
-    promise.then((compResult)=>{
-        console.log(`${project}-${suite}/${prId} : comparison (AVEC scan) => comparison.hasFailed`, compResult.hasFailed);
-        addComparison(project, suite, prId, {
-          project,
-          suite,
-          prId,
-          hasFailed  : compResult.hasFailed,
-          hasNew     : compResult.hasNew,
-          hasDeleted : compResult.hasDeleted,
-          hasPassed  : compResult.hasPassed,
-          title      : suiteDescription.title,
-          date       : compResult.date,
-        })
-        scanInProgress--
+    return visualCompare(project, suite, prId, suiteDescription.beforeVersion)
+    .then((compResult)=>{
+      console.log(`${project}-${suite}/${prId} : comparison (AVEC scan) => compResult.hasFailed`, compResult.hasFailed);
+      const addedComp = {
+        project,
+        suite,
+        prId,
+        hasFailed  : compResult.hasFailed,
+        hasNew     : compResult.hasNew,
+        hasDeleted : compResult.hasDeleted,
+        hasPassed  : compResult.hasPassed,
+        title      : suiteDescription.title,
+        date       : compResult.date,
+      }
+      addComparison(project, suite, prId, addedComp)
+      scanInProgress--
+      return addedComp
     })
-    return promise
+
   }else{
     // add or update the test to the list
     console.log('add to testsDictionnary', `${project}-${suite}-${prId}` );
     console.log(`${project}-${suite}-${prId} : comparison (SANS scan) => comparison.hasFailed`, comparison.hasFailed);
-    addComparison(project, suite, prId, {
+    const addedComp = {
       project,
       suite,
       prId,
@@ -212,8 +226,9 @@ function scanTest(project, suite, prId, force) {
       hasPassed  : comparison.hasPassed,
       date       : comparison.date,
       title      : suiteDescription.title,
-    })
-    return suiteDescription // TODO : not sure that that we should return a resolved promise instead of a value...
+    }
+    addComparison(project, suite, prId, addedComp)
+    return addedComp // TODO : not sure that that we should return a resolved promise instead of a value...
   }
 }
 
@@ -230,16 +245,17 @@ function addComparison (project, suite, prId, comp) {
     comparisonsDictionnary[project] = existingPro
     existingPro[suite]=existingSuite
     existingSuite[prId]=comp
-    return
+    return comp
   }
   existingSuite = existingPro[suite]
   if (!existingSuite) {
     existingSuite = {}
     existingPro[suite] = existingSuite
     existingSuite[prId]=comp
-    return
+    return comp
   }
   existingSuite[prId] = comp
+  return comp
 }
 
 
@@ -267,7 +283,7 @@ function getComparisons() {
 /* START server when all directories are re scanned          */
 server.listen(PORT);
 console.log('Hi! Cozy visual tests dashboard is running on http://localhost:'.magenta + PORT);
-scanTests().then(()=>{
+scanAllProjects().then(()=>{
   console.log('\n___all promises fullfiled');
   // console.log('testsDictionnary')
   // console.log(testsDictionnary)

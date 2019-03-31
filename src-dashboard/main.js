@@ -20,7 +20,6 @@ req.onreadystatechange = function(event) {
     if (this.readyState === XMLHttpRequest.DONE) {
         if (this.status === 200) {
             STORE = JSON.parse(this.responseText)
-            console.log(STORE);
             resultsViewCtrler.init()
         } else {
             console.log("Status de la réponse: %d (%s)", this.status, this.statusText);
@@ -43,7 +42,6 @@ resultsViewCtrler.init = ()=>{
     project.view = newDiv
     resultsContainerV.appendChild(newDiv)
   }
-
   // create comparison rows views
   for (var projectId in STORE) {
     var project = STORE[projectId]
@@ -58,7 +56,6 @@ resultsViewCtrler.init = ()=>{
         rowView = document.createElement('tr')
         comparison.view = rowView
         comparison.dateF = moment(comparison.date).format('YYYY-MM-DD HH[h]mm')
-        console.log(comparison);
         rowView.innerHTML = rowTemplate(comparison)
         rowView.addEventListener('click', goToReport(comparison), false)
         const refreshBtn = rowView.getElementsByClassName('refreshCell')[0]
@@ -80,33 +77,7 @@ function sortRows(rows) {
 }
 
 
-refreshComparisonListener = (comparison) => {
-  return (e) => {
-    refreshComparison(comparison)
-    e.stopPropagation()
-  }
-}
-
-refreshComparison = (comparison) => {
-  console.log(`refesh /report/${comparison.project}-${comparison.suite}/${comparison.prId}/`)
-  req.onreadystatechange = function(event) {
-      // XMLHttpRequest.DONE === 4
-      if (this.readyState === XMLHttpRequest.DONE) {
-          if (this.status === 200) {
-              STORE = JSON.parse(this.responseText)
-              console.log(STORE);
-              resultsViewCtrler.init()
-          } else {
-              console.log("Status de la réponse: %d (%s)", this.status, this.statusText);
-          }
-      }
-  };
-  req.open('POST', `/api/${comparison.project}/${comparison.suite}/${comparison.prId}`, true);
-  req.send(null);
-}
-
 goToReport = (comparison) => {
-  console.log(`/report/${comparison.project}-${comparison.suite}/${comparison.prId}/`);
   return () => window.location = `/report/${comparison.project}-${comparison.suite}/${comparison.prId}/`
 }
 
@@ -117,8 +88,6 @@ resultsViewCtrler.hideSuccessRows = (shouldHide) =>{
   // create comparison rows views
   for (var projectId in STORE) {
     var project = STORE[projectId]
-    // project.view
-    // tableBody = project.view.getElementsByTagName('tbody')[0]
     var numberOfVisibleRows = 0
     for (var suiteId in project) {
       if (suiteId === 'view') continue
@@ -142,7 +111,6 @@ resultsViewCtrler.hideSuccessRows = (shouldHide) =>{
   }
 }
 
-
 const hideSuccessBtn = document.getElementById('hideSuccessBtn')
 const hideSuccessInput = hideSuccessBtn.getElementsByTagName('INPUT')[0]
 hideSuccessBtn.addEventListener('click', (e)=>{
@@ -150,3 +118,50 @@ hideSuccessBtn.addEventListener('click', (e)=>{
   if(e.target.nodeName==='LABEL') hideSuccessInput.checked = !hideSuccessInput.checked
   resultsViewCtrler.hideSuccessRows(hideSuccessInput.checked)
 })
+
+
+/*************************************************************/
+/*  VIEW CONTROLER REFRESH A ROW                             */
+resultsViewCtrler.refreshRow = (comp) =>{
+  // find row's view
+  const comparison = ((STORE[comp.project] || {})[comp.suite] || {})[comp.prId]
+  if (!comparison){
+    console.log('refreshRow of an unexisting row', comp);
+    return
+  }
+  // update stored data with new data
+  comp.view  = comparison.view
+  comp.dateF = moment(comp.date).format('YYYY-MM-DD HH[h]mm')
+  STORE[comp.project][comp.suite][comp.prId] = comp
+  // update row's html
+  comparison.view.innerHTML = rowTemplate(comp)
+
+}
+
+
+
+/*************************************************************/
+/*  REFRESH ROWS LISTENER                                    */
+refreshComparisonListener = (comparison) => {
+  return (e) => {
+    refreshComparison(comparison)
+    e.stopPropagation()
+  }
+}
+
+refreshComparison = (comparison) => {
+  console.log(`refesh /report/${comparison.project}-${comparison.suite}/${comparison.prId}/`)
+  req.onreadystatechange = function(event) {
+      // XMLHttpRequest.DONE === 4
+      if (this.readyState === XMLHttpRequest.DONE) {
+          if (this.status === 200) {
+              const comparison = JSON.parse(this.responseText)
+              resultsViewCtrler.refreshRow(comparison)
+          } else {
+              console.log("Status de la réponse: %d (%s)", this.status, this.statusText);
+          }
+      }
+  };
+  req.open('POST', `/api/${comparison.project}/${comparison.suite}/${comparison.prId}/refresh`, true);
+  req.send(null);
+}

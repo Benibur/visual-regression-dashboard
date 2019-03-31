@@ -17,7 +17,7 @@
 
                 <div v-if="expectedDir" class="capture" v-on:click="open(item.encoded, expectedDir)">
                     <capture-image :kind="'Before'" :src="createSrc(expectedDir, item.encoded)" :hasMask="item.hasMask"
-                      :file="item.encoded" :canDeleteItem="itemType==='deletedItem'"></capture-image>
+                      :file="item.encoded" :canDeleteItem="itemType==='deletedItem'" :deleteItem="deleteItem"></capture-image>
                 </div>
 
             </div>
@@ -34,7 +34,9 @@ export default {
   components: {
       'capture-image': CaptureImage,
   },
-  props: ['items', 'color', 'icon', 'openCapture', 'openComparison', 'diffDir', 'actualDir', 'expectedDir', 'shouldDisplaySetAsRef', 'setImageAsReference', 'openMask', 'itemType'],
+  props: ['items', 'color', 'icon', 'openCapture', 'openComparison', 'diffDir',
+  'actualDir', 'expectedDir', 'shouldDisplaySetAsRef', 'setImageAsReference',
+  'openMask', 'itemType', 'deleteItem'],
   methods: {
     open: function(src, dir) {
       if (this.openComparison) {

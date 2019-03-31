@@ -74,7 +74,7 @@
       </h2>
       <div class="ui divider"  v-if="deletedItems.length"></div>
       <item-details class="items" :icon="'trash outline'" :color="'grey'" :items="deletedItems" :itemType="'deletedItem'" :openCapture="openCapture"
-        :expectedDir="expectedDir" :shouldDisplaySetAsRef="true" :setImageAsReference="setImageAsReference">
+        :expectedDir="expectedDir" :shouldDisplaySetAsRef="true" :setImageAsReference="setImageAsReference" :deleteItem="deleteItem">
       </item-details>
 
       <h2 class="ui header items-header green" v-if="passedItems.length">
@@ -254,6 +254,10 @@ export default {
     filter: debounce(function(search) {
       ['failedItems', 'passedItems', 'newItems', 'deletedItems'].forEach(type => this[type] = searchItems(type, search));
     }, SEARCH_DEBOUNCE_MSEC),
+
+    deleteItem(file){
+      console.log("request deletion of ", file);
+    }
   }
 }
 </script>
