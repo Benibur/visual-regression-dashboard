@@ -1,14 +1,14 @@
-const http            = require('http'              )
-const path            = require('path'              )
-const express         = require('express'           )
-const colors          = require('colors'            )
-const reload          = require('reload'            )
-const Watch           = require('gaze'              ).Gaze
-const fs              = require('fs'                )
-const Promise         = require('bluebird'          )
-const visualCompare   = require('./reg-cli/main.js' )
-const bodyParser      = require('body-parser'       )
-const glob            = require('glob'              )
+const http            = require('http'                          )
+const path            = require('path'                          )
+const express         = require('express'                       )
+const colors          = require('colors'                        )
+const reload          = require('reload'                        )
+const Watch           = require('gaze'                          ).Gaze
+const fs              = require('fs'                            )
+const Promise         = require('bluebird'                      )
+const visualCompare   = require('../src-report/reg-cli/main.js' )
+const bodyParser      = require('body-parser'                   )
+const glob            = require('glob'                          )
 
 
 /*************************************************************/
@@ -57,13 +57,25 @@ app.post('/api/:projectId/:suiteId/:prId/set-as-reference/:filename', function(r
   }
   catch (e) {}
   finally {
-    console.log('file moved, re-scan the directory');
-    // scanTest('public/'+p.testId, true)   // update the comparison TODO : delay in the case where a scan is in progress
-    scanTest(p.projectId, p.suiteId, p.prId, true)   // update the comparison TODO : delay in the case where a scan is in progress
+    console.log('file moved, re-scan the suite on all PRs'); // TODO we should rescan the whole suite, not only the current pr ! ! a queue would be better.
+    scanTest(p.projectId, p.suiteId, p.prId, true)           // update the comparison TODO : delay in the case where a scan is in progress
     .then(()=>{
       res.send(true)
     })
   }
+});
+
+
+/*************************************************************/
+/* ROUTE to refresh the comparison of a PR                   */
+app.post('/api/:projectId/:suiteId/:prId/refresh', function(req, res) {
+  const p = req.params
+  console.log('route for refresh comparison :',  `public/${p.projectId}-${p.suiteId}/${p.prId}`);
+  // update the comparison
+  scanTest(p.projectId, p.suiteId, p.prId, true)           // update the comparison TODO : delay in the case where a scan is in progress
+  .then(()=>{
+    res.send(true)
+  })
 });
 
 
@@ -137,8 +149,7 @@ watchReport.on('all', function (evt, filepath) {
 /* INITIAL SCAN of tests folders                             */
 function scanTests() {
   const fileNames = fs.readdirSync('public')
-  const prDirectories = glob.sync('*/*/pr-*')
-
+  const prDirectories = glob.sync('public/*/pr-*')
   return Promise.map(prDirectories, dir => {
     dir = dir.split(path.sep)
     const match   = dir[1].match(/[\w_]+/g)
@@ -171,25 +182,38 @@ function scanTest(project, suite, prId, force) {
     scanInProgress++
     // updateMasked(dirPath)
     var promise = visualCompare(project, suite, prId, suiteDescription.beforeVersion)
-    promise.then((result)=>{
-        // result.hasNew  = result.newItems.length > 0 // TODO : rôle ?
-        // comparisonsDictionnary[`${project}-${suite}-${prId}`] = comparison
-        // testsDictionnary[`${project}-${suite}`] = test
-        console.log(`${project}-${suite}/${prId} : comparison (AVEC scan) => comparison.isError`, result.isError);
-        addComparison(project, suite, prId, {project, suite, prId, isError: result.isError, title:suiteDescription.title, date:result.date} )
+    promise.then((compResult)=>{
+        console.log(`${project}-${suite}/${prId} : comparison (AVEC scan) => comparison.hasFailed`, compResult.hasFailed);
+        addComparison(project, suite, prId, {
+          project,
+          suite,
+          prId,
+          hasFailed  : compResult.hasFailed,
+          hasNew     : compResult.hasNew,
+          hasDeleted : compResult.hasDeleted,
+          hasPassed  : compResult.hasPassed,
+          title      : suiteDescription.title,
+          date       : compResult.date,
+        })
         scanInProgress--
     })
     return promise
   }else{
     // add or update the test to the list
-    // test.isError += comparison.isError ? 1 : -1
     console.log('add to testsDictionnary', `${project}-${suite}-${prId}` );
-    // testsDictionnary[`${project}-${suite}`] = test
-    // comparisonsDictionnary[`${project}-${suite}-${prId}`] = comparison
-    console.log(`${project}-${suite}-${prId} : comparison (SANS scan) => comparison.isError`, comparison.isError);
-    // addComparison(project, suite, prId, comparison)
-    addComparison(project, suite, prId, {project, suite, prId, isError: comparison.isError, title:suiteDescription.title, date:Date.now() })
-    return comparison // TODO : not sure that that we should return a resolved promise instead of a value...
+    console.log(`${project}-${suite}-${prId} : comparison (SANS scan) => comparison.hasFailed`, comparison.hasFailed);
+    addComparison(project, suite, prId, {
+      project,
+      suite,
+      prId,
+      hasFailed  : comparison.hasFailed,
+      hasNew     : comparison.hasNew,
+      hasDeleted : comparison.hasDeleted,
+      hasPassed  : comparison.hasPassed,
+      date       : comparison.date,
+      title      : suiteDescription.title,
+    })
+    return suiteDescription // TODO : not sure that that we should return a resolved promise instead of a value...
   }
 }
 
@@ -199,7 +223,6 @@ function scanTest(project, suite, prId, force) {
 function addComparison (project, suite, prId, comp) {
   console.log('addComparison', project, suite, prId);
   var existingPro, existingSuite
-
   existingPro = comparisonsDictionnary[project]
   if (!existingPro){
     existingPro = {}
@@ -209,7 +232,6 @@ function addComparison (project, suite, prId, comp) {
     existingSuite[prId]=comp
     return
   }
-
   existingSuite = existingPro[suite]
   if (!existingSuite) {
     existingSuite = {}
@@ -217,14 +239,7 @@ function addComparison (project, suite, prId, comp) {
     existingSuite[prId]=comp
     return
   }
-
   existingSuite[prId] = comp
-
-  // comparisonsDictionnary[`${project}-${suite}-${prId}`] = comparison
-  // comparisonsDictionnary[`${project}-${suite}-${prId}`] = comparison
-  // comparisonsDictionnary[`${project}-${suite}-${prId}`] = comparison
-  // testsDictionnary[`${project}-${suite}`] = test
-  // console.log(`${project}-${suite}-${prId} : comparison (AVEC scan) =>`, test.isError)
 }
 
 
@@ -244,13 +259,6 @@ function updateMasked(dirPath) {
 /* return a dictionnary of all the comparisons               */
 /* structure : {project.suite.prId:{comparison}}             */
 function getComparisons() {
-  // console.log('\n___getTestsList - scanInProgress =', scanInProgress);
-  // const testsList = []
-  // for (var test in testsDictionnary) {
-  //   testsList.push(testsDictionnary[test])
-  // }
-  // testsList.sort((a, b)=> a.testId > b.testId )
-  // return testsList
   return comparisonsDictionnary
 }
 

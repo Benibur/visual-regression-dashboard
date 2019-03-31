@@ -12,8 +12,8 @@
     "server:dev": "./node_modules/nodemon/bin/nodemon.js --watch ./src-server/server.js ./src-server/server.js",
     "dashboard:build": "cd src-dashboard/ && webpack --config webpack.config.js",
     "dashboard:dev": "cd src-dashboard/ && webpack --config webpack.config.js --watch",
-    "report:build": "webpack --mode production --config src-server/webpack.config.js",
-    "report:dev": "webpack --mode production --watch --config src-server/webpack.config.js",
+    "report:build": "webpack --mode production --config src-report/webpack.config.js",
+    "report:dev": "webpack --mode production --watch --config src-report/webpack.config.js",
     "test:init": "./test/init.sh"
   },
   "dependencies": {

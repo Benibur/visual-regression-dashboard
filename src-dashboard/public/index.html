@@ -6,8 +6,12 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/semantic-ui/2.2.7/semantic.min.css">
     <link href="https://fonts.googleapis.com/css?family=Dosis" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Lato:300,400" rel="stylesheet">
+
     <style type="text/css">
       tr {cursor:pointer;}
+      #hideSuccessBtn label {cursor:pointer;}
+      .refreshCell>i {color:grey}
+      .refreshCell:hover>i {color:white}
     </style>
 
   </head>
@@ -20,8 +24,16 @@
             <img class="" src="cozy-logo-name-horizontal-blue.svg" style="width:5em;"></img>
           </a>
           <div class="ui item">Cozy visual tests dashboard</div>
+          <div id="filters" class="ui item">
+            <div class="ui checkbox" id="hideSuccessBtn">
+              <input type="checkbox"  autocomplete="off" >
+              <label>Hide success</label>
+            </div>
+          </div>
         </div>
     </div>
+
+
 
     <div id="results-container" class="ui container">
     </div>

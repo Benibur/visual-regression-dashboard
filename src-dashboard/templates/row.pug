@@ -3,12 +3,18 @@ td.collapsing.grey.center.aligned #{project}
 td.collapsing.grey.center.aligned #{suite}
 td.collapsing.grey.center.aligned #{prId}
 td.collapsing.grey.center.aligned #{dateF}
-  //- a(href='/tests/'+testId) 
-td.collapsing.center.aligned
-  if isError
+if hasFailed
+  td.collapsing.center.aligned(data-tooltip="Has failed comparisons")
     i.large.red.icon.close
-  else if hasNew
-    i.large.orange.icon.file.outline
-  else
+else if hasNew
+  td.collapsing.center.aligned(data-tooltip="Has new images")
+    i.large.blue.icon.file.outline
+else if hasDeleted
+  td.collapsing.center.aligned(data-tooltip="Has some deleted images")
+    i.large.red.icon.trash.outline
+else
+  td.collapsing.center.aligned
     i.large.green.icon.checkmark
 td #{title}
+td.collapsing.refreshCell
+  i.icon.refresh
