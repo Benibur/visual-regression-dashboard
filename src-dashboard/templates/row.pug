@@ -1,0 +1,14 @@
+
+td.collapsing.grey.center.aligned #{project}
+td.collapsing.grey.center.aligned #{suite}
+td.collapsing.grey.center.aligned #{prId}
+td.collapsing.grey.center.aligned #{dateF}
+  //- a(href='/tests/'+testId) 
+td.collapsing.center.aligned
+  if isError
+    i.large.red.icon.close
+  else if hasNew
+    i.large.orange.icon.file.outline
+  else
+    i.large.green.icon.checkmark
+td #{title}

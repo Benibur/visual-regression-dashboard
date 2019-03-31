@@ -1,30 +1,9 @@
-#!/usr/bin/env node
 
-/* @flow */
-
-// const Spinner = require('cli-spinner').Spinner
-const path    = require('path'       )
-const compare = require('./compare'  )
-const log     = require('./log'      )
-// import meow from 'meow';
-// import path from 'path';
-// import compare from './compare';
-// log = console.log
-// import notifier from './notifier';
-const { BALLOT_X, CHECK_MARK, TEARDROP, MULTIPLICATION_X, GREEK_CROSS, MINUS } = require('./icon')
-
+const path        = require('path'       )
+const compare     = require('./compare'  )
+const log         = require('./log'      )
 const IMAGE_FILES = '/**/*.+(tiff|jpeg|jpg|gif|png|bmp)';
 
-// const spinner = new Spinner();
-// spinner.setSpinnerString(18);
-//
-// if (!process.argv[2] || !process.argv[3] || !process.argv[4]) {
-//   log.fail('please specify actual, expected and diff images directory.');
-//   log.fail('e.g.: $ reg-cli /path/to/actual-dir /path/to/expected-dir /path/to/diff-dir');
-//   process.exit(1);
-// }
-//
-// const cli = meow(`
 //   Usage
 //     $ reg-cli /path/to/actual-dir /path/to/expected-dir /path/to/diff-dir
 //   Options
@@ -59,74 +38,37 @@ const IMAGE_FILES = '/**/*.+(tiff|jpeg|jpg|gif|png|bmp)';
 //     },
 //   });
 
-function visualCompare(dirPath, runId, testId) {
-
-  console.log('Tests visuels de', dirPath);
-
-  const urlPrefix      = './'
-  const json           = dirPath + '/comparison-description.json'
-  const report         = dirPath + '/index.html'
-  const actualDir      = dirPath + '/after'
-  const expectedDir    = dirPath + '/before'
-  const diffDir        = dirPath + '/diff'   // TODO tests diff directory exists
-  const update         = false
-  const extendedErrors = false
-  const ignoreChange   = false  // TODO : role ?
+function visualCompare(project, suite, prId, nextBeforeVersion) {
+  const prPath         = `public/${project}-${suite}/${prId}/`
+  const expectedDir    = `public/${project}-${suite}/before/`
+  const json           = prPath + 'comparison-description.json'
+  const report         = prPath + 'index.html'
+  const actualDir      = prPath + 'after'
+  const diffDir        = prPath + 'diff'   // TODO tests diff directory exists
+  const urlPrefix      =
+  console.log('Tests visuels de', prPath);
 
   // const observer = compare({
   return compare({
-    actualDir                              ,
-    expectedDir                            ,
-    diffDir                                ,
-    update                                 ,
-    report                                 ,
-    json                                   ,
-    runId                                  ,
-    testId                                 ,
-    urlPrefix                              ,
-    matchingThreshold: Number(0)           ,
-    thresholdRate: Number(0)               , // TODO : role ??
-    thresholdPixel: Number(0)              , // TODO : role ??
-    concurrency: 4                         ,
-    enableAntialias: false                 ,
-    enableClientAdditionalDetection: false
+    actualDir                                   ,
+    expectedDir                                 ,
+    diffDir                                     ,
+    json                                        ,
+    project                                     ,
+    suite                                       ,
+    prId                                        ,
+    nextBeforeVersion                           ,
+    report                                      ,
+    concurrency                     : 4         ,
+    update                          : false     ,
+    urlPrefix                       : './'      ,
+    matchingThreshold               : Number(0) ,
+    thresholdRate                   : Number(0) , // TODO  role ??
+    thresholdPixel                  : Number(0) , // TODO  role ??
+    enableAntialias                 : false     ,
+    enableClientAdditionalDetection : false
   });
 
-  // observer.once('start', () => '');
-  //
-  // observer.on('compare', (params) => {
-  //   // spinner.stop(true);
-  //   const file = path.join(`${actualDir}`, `${params.path}`);
-  //   switch (params.type) {
-  //     case 'delete': return log.warn(`${MINUS} delete  ${file}`);
-  //     case 'new': return log.info(`${GREEK_CROSS} append  ${file}`);
-  //     case 'pass': return log.success(`${CHECK_MARK} pass    ${file}`);
-  //     case 'fail': return log.fail(`${BALLOT_X} change  ${file}`);
-  //   }
-  //   // spinner.start();
-  // });
-  //
-  // observer.once('update', () => log.success(`✨ your expected images are updated ✨`));
-  //
-  // observer.once('complete', ({ failedItems, deletedItems, newItems, passedItems }) => {
-  //   // spinner.stop(true);
-  //   // log.info('\n');
-  //   if (failedItems.length) log.fail(`${BALLOT_X} ${failedItems.length} file(s) changed.`);
-  //   if (deletedItems.length) log.warn(`${MINUS} ${deletedItems.length} file(s) deleted.`);
-  //   if (newItems.length) log.info(`${GREEK_CROSS} ${newItems.length} file(s) appended.`);
-  //   if (passedItems.length) log.success(`${CHECK_MARK} ${passedItems.length} file(s) passed.`);
-  //   if (!update && (failedItems.length > 0 || (extendedErrors && (newItems.length > 0 || deletedItems.length > 0)))) {
-  //     log.fail(`\nInspect your code changes, re-run with \`-U\` to update them. `);
-  //   }
-  //   console.log('à la fin du visual compare on retourne  dans le cb isError à', failedItems.length>0);
-  //   cb(failedItems.length>0)
-  //   return;
-  // });
-  //
-  // observer.once('error', (error) => {
-  //   log.fail(error);
-  //   process.exit(1);
-  // });
 }
 
 module.exports = visualCompare

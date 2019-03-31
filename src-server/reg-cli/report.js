@@ -20,9 +20,10 @@ const encodeFilePath = filePath => {
 };
 
 const createJSONReport = params => {
+  console.log('in createJSONReport, beforeVersion', params.beforeVersion);
   return {
-    runId        : params.testChrono,
-    testId       : params.testId,
+    beforeVersion: params.beforeVersion,
+    date         : params.date,
     isError      : params.failedItems.length > 0,
     failedItems  : params.failedItems,
     newItems     : params.newItems,
@@ -41,18 +42,21 @@ const createHTMLReport = params => {
   const file     = path.join(__dirname, '../report/template/template.html');
   const js       = fs.readFileSync(path.join(__dirname, '../report/dist/build.js'));
   const template = fs.readFileSync(file);
-  const testId   = params.testId
   const json     = {
+    projectId:      params.project,
+    suiteId:        params.suite,
+    prId:           params.prId,
+    beforeVersion:  params.beforeVersion,
+    date:           params.date,
     type:           params.failedItems.length === 0 ? 'success' : 'danger',
-    testId:         params.testId,
     hasNew:         params.newItems.length     > 0,
     hasDeleted:     params.deletedItems.length > 0,
     hasPassed:      params.passedItems.length  > 0,
     hasFailed:      params.failedItems.length  > 0,
-    newItems:       params.newItems.map(    item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item,testId) })),
-    deletedItems:   params.deletedItems.map(item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item,testId) })),
-    passedItems:    params.passedItems.map( item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item,testId) })),
-    failedItems:    params.failedItems.map( item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item,testId) })),
+    newItems:       params.newItems.map(    item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.project, params.suite) })),
+    deletedItems:   params.deletedItems.map(item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.project, params.suite) })),
+    passedItems:    params.passedItems.map( item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.project, params.suite) })),
+    failedItems:    params.failedItems.map( item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.project, params.suite) })),
     actualDir:      `${params.urlPrefix}${path.relative(path.dirname(params.report), params.actualDir)}`,
     expectedDir:    `${params.urlPrefix}${path.relative(path.dirname(params.report), params.expectedDir)}`,
     diffDir:        `${params.urlPrefix}${path.relative(path.dirname(params.report), params.diffDir)}`,
@@ -70,9 +74,8 @@ const createHTMLReport = params => {
   return Mustache.render(template.toString(), view);
 };
 
-function hasMask(item, testId) {
-  // console.log('hasMask:item','public/'+testId+'/mask/'+item+'.json', fs.existsSync('./public/'+testId+'/mask/'+item+'.json'));
-  return fs.existsSync('./public/'+testId+'/mask/'+item+'.json')
+function hasMask(item, project, suite) {
+  return fs.existsSync(`./public/${project}-${suite}/mask/${item}.json`)
 }
 
 function createXimdiffWorker(params) {

@@ -1,65 +1,71 @@
+const projectTemplate   = require('./templates/project.pug' )
+const rowTemplate       = require('./templates/row.pug'     )
+const moment            = require('moment'                  )
+
 /*************************************************************/
 /*  GLOBALS                                                  */
-const appTemplate       = require('./templates/template-app.pug' )
-const rowTemplate       = require('./templates/template-row.pug' )
 const resultsViewCtrler = {}
 const testedApps        = {}
 const req               = new XMLHttpRequest()
 const resultsContainerV = document.getElementById('results-container')
-var   tests // array of tests
+var   STORE //  sotre of data, a dictionnary of comparisons {project.suite.prId:{comparison}}
 
+moment.locale('fr');
 
 /*************************************************************/
 /* GET FROM SERVER THE LIST OF TESTS                         */
+
 req.onreadystatechange = function(event) {
     // XMLHttpRequest.DONE === 4
     if (this.readyState === XMLHttpRequest.DONE) {
         if (this.status === 200) {
-            tests = JSON.parse(this.responseText)
+            STORE = JSON.parse(this.responseText)
+            console.log(STORE);
             resultsViewCtrler.init()
         } else {
             console.log("Status de la réponse: %d (%s)", this.status, this.statusText);
         }
     }
 };
-req.open('GET', '/tests-list', true);
+req.open('GET', '/api/comparisons-list', true);
 req.send(null);
 
 
 /*************************************************************/
 /*  VIEW CONTROLER                                           */
 resultsViewCtrler.init = ()=>{
-
-  // init the testedApps dictionnary
-  // {view : #domNode, testsData:[{#testData}]}
-  for (test of tests) {
-    if (!testedApps[test.appId]) {
-      testedApps[test.appId] = {view: null, testsData: []}
-    }
-    testedApps[test.appId].testsData.push(test) //
-  }
-  console.log(testedApps);
-
+  console.log('resultsViewCtrler.init()');
   // create apps views
-  for (var app in testedApps) {
+  for (var projectId in STORE) {
+    var project = STORE[projectId]
     var newDiv = document.createElement("div")
-    newDiv.innerHTML = appTemplate({appName:app})
-    testedApps[app].view = newDiv
+    newDiv.innerHTML = projectTemplate({appName:projectId})
+    project.view = newDiv
     resultsContainerV.appendChild(newDiv)
   }
 
-  // create test rows views
-  for (var app in testedApps) {
-    tableBody = testedApps[app].view.getElementsByTagName('tbody')[0]
-    for (test of testedApps[app].testsData) {
-      row = document.createElement('tr')
-      row.innerHTML = rowTemplate(test)
-      tableBody.appendChild(row)
-      gotoReport = (testId) => {
-        return () => window.location = '/tests/' + testId
+  // create comparison rows views
+  for (var projectId in STORE) {
+    var project = STORE[projectId]
+    tableBody = project.view.getElementsByTagName('tbody')[0]
+    for (var suiteId in project) {
+      if (suiteId === 'view') continue
+      var suite = project[suiteId]
+      for (var prId in suite) {
+        var comparison = suite[prId]
+        // console.log(projectId, suiteId, prId, comparison)
+        row = document.createElement('tr')
+        comparison.view = row
+        comparison.dateF = moment(comparison.date).format('YYYY-MM-DD HH[h]mm')
+        console.log(comparison.dateF);
+        row.innerHTML = rowTemplate(comparison)
+        tableBody.appendChild(row)
+        row.addEventListener('click', goToReport(comparison), false)
       }
-      row.addEventListener('click', gotoReport(test.testId), false)
     }
   }
+}
 
+goToReport = (comparison) => {
+  return () => window.location = `/report/${comparison.project}-${comparison.suite}/${comparison.prId}/`
 }

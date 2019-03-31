@@ -172,12 +172,12 @@ export default {
         this.deletedItems.length === 0;
     },
   },
-  mounted: function () {
-    setTimeout(
-      ()=> this.openMask('sample.2.should_be_2_but_1_in_before.png', true) // TODO remove
-      , 10
-    )
-  },
+  // mounted: function () {
+  //   setTimeout(
+  //     ()=> this.openMask('sample.2.should_be_2_but_1_in_before.png', true) // TODO remove
+  //     , 10
+  //   )
+  // },
   methods: {
     openCapture(src, bg) {
       this.modalSrc    = src

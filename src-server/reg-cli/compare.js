@@ -97,11 +97,13 @@ module.exports = (params) => {
     expectedDir,
     diffDir,
     json,
-    runId,
-    testId,
+    project,
+    suite,
+    prId,
+    nextBeforeVersion,
+    report,
     concurrency,
     update,
-    report,
     urlPrefix,
     threshold,
     matchingThreshold,
@@ -110,13 +112,12 @@ module.exports = (params) => {
     enableAntialias,
     enableClientAdditionalDetection,
   } = params;
-  const dirs = { actualDir, expectedDir, diffDir };
-  const emitter = new EventEmitter();
+  const dirs           = { actualDir, expectedDir, diffDir };
+  const emitter        = new EventEmitter();
   const expectedImages = glob.sync(`${expectedDir}${IMAGE_FILES}`).map(p => path.relative(expectedDir, p)).map(p => p[0] === path.sep ? p.slice(1) : p);
   const actualImages   = glob.sync(`${actualDir}${IMAGE_FILES}`  ).map(p => path.relative(actualDir, p)  ).map(p => p[0] === path.sep ? p.slice(1) : p);
-  const deletedImages = difference(expectedImages, actualImages);
-  const newImages = difference(actualImages, expectedImages);
-  console.log('actualImages', actualImages);
+  const deletedImages  = difference(expectedImages, actualImages);
+  const newImages      = difference(actualImages, expectedImages);
   mkdirp.sync(expectedDir);
   mkdirp.sync(diffDir);
 
@@ -134,23 +135,26 @@ module.exports = (params) => {
     .then(result => aggregate(result))
     .then(({ passed, failed, diffItems }) => {
       return createReport({
-        passedItems: passed,
-        failedItems: failed,
-        newItems: newImages,
-        deletedItems: deletedImages,
-        expectedItems: update ? actualImages : expectedImages,
+        projectId             : project,
+        suiteId               : suite,
+        prId                  : prId,
+        beforeVersion         : nextBeforeVersion,
+        date                  : Date.now(),
+        passedItems           : passed,
+        failedItems           : failed,
+        newItems              : newImages,
+        deletedItems          : deletedImages,
+        expectedItems         : update ? actualImages : expectedImages,
         previousExpectedImages: expectedImages,
-        actualItems: actualImages,
+        actualItems           : actualImages,
         diffItems,
-        json: json || './reg.json',
-        runId,
-        testId,
+        json                  : json || './reg.json',
         actualDir,
         expectedDir,
         diffDir,
-        report: report || '',
-        urlPrefix: urlPrefix || '',
-        enableClientAdditionalDetection: !!enableClientAdditionalDetection,
+        report                : report    || '',
+        urlPrefix             : urlPrefix || '',
+        enableClientAdditionalDetection:  !!enableClientAdditionalDetection,
       });
     })
     .then(result => {

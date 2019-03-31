@@ -25,7 +25,7 @@
           </div> -->
           <div class="ui buttons">
             <button class="ui button" v-on:click="deleteSelectedMask">
-              Delete selected mask (Suppr)<i class="right trash alternate outline icon"></i>
+              Delete selected mask!! (Suppr)<i class="right trash alternate outline icon"></i>
             </button>
             <button class="ui button" v-on:click="closeModal">{{cancelLabel}}</button>
             <button class="ui positive button" v-on:click="saveMask">Save</button>

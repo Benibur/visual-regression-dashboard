@@ -3,27 +3,30 @@ const path            = require('path'              )
 const express         = require('express'           )
 const colors          = require('colors'            )
 const reload          = require('reload'            )
-const watch           = require('node-watch'        )
+const Watch           = require('gaze'              ).Gaze
 const fs              = require('fs'                )
 const Promise         = require('bluebird'          )
 const visualCompare   = require('./reg-cli/main.js' )
 const bodyParser      = require('body-parser'       )
+const glob            = require('glob'              )
 
 
 /*************************************************************/
 /* GLOBALS                                                   */
-const PORT             = 8080
-const testsDictionnary = {}
-const app              = express()
-const server           = http.createServer(app)
-var   scanInProgress   = 0
+const PORT                   = 8080
+const testsDictionnary       = {}
+const comparisonsDictionnary = {}
+const app                    = express()
+const server                 = http.createServer(app)
+var   scanInProgress         = 0
 
 
 /*************************************************************/
-/* ROUTE to get the list of tests                            */
-app.get('/tests-list', function(req, res) {
-  res.json(getTestsList());
-});
+/* ROUTE to get the comparisons                              */
+/* structure : {project.suite.prId:{comparison}}             */
+app.get('/api/comparisons-list', function(req, res) {
+  res.json(getComparisons())
+})
 
 
 /*************************************************************/
@@ -35,17 +38,18 @@ app.use(express.static('src-dashboard/public'))
 
 
 /*************************************************************/
-/* ROUTE for the test web pages                              */
-app.use('/tests', express.static('public') );
+/* ROUTE for the report web pages                              */
+app.use('/report', express.static('public') );
 
 
 /*************************************************************/
 /* ROUTE to set an image as a reference                      */
-app.post('/tests/:testId/set-as-reference/:filename', function(req, res) {
-  console.log('route for set-as-reference of app',  req.params.testId, '/', req.params.filename);
-  const src  = 'public/' + req.params.testId + '/after/'  + req.params.filename
-  const dest = 'public/' + req.params.testId + '/before/' + req.params.filename
-  const diff = 'public/' + req.params.testId + '/diff/'   + req.params.filename
+app.post('/api/:projectId/:suiteId/:prId/set-as-reference/:filename', function(req, res) {
+  const p = req.params
+  const src  = `public/${p.projectId}-${p.suiteId}/pr-${p.prId}/after/${p.filename}`
+  const diff = `public/${p.projectId}-${p.suiteId}/pr-${p.prId}/diff/${p.filename}`
+  const dest = `public/${p.projectId}-${p.suiteId}/before/${p.filename}`
+  console.log('ROUTE for set-as-reference',  src);
   fs.copyFileSync(src, dest)
   try {
     console.log('try delete', diff);
@@ -53,8 +57,9 @@ app.post('/tests/:testId/set-as-reference/:filename', function(req, res) {
   }
   catch (e) {}
   finally {
-    console.log('file moved, ow re-scan the directory');
-    scanTest('public/'+req.params.testId, true)   // update the comparison TODO : delay in the case where a scan is in progress
+    console.log('file moved, re-scan the directory');
+    // scanTest('public/'+p.testId, true)   // update the comparison TODO : delay in the case where a scan is in progress
+    scanTest(p.projectId, p.suiteId, p.prId, true)   // update the comparison TODO : delay in the case where a scan is in progress
     .then(()=>{
       res.send(true)
     })
@@ -95,26 +100,30 @@ reloadBrowser = reload(app)
 /*************************************************************/
 /* RELOAD web page when the dashboard code changes           */
 /* (for ease of dev)                                         */
-watch("./src-dashboard/public",{ recursive: true }, function (evt, name) {
-    console.log('reload client !');
+const watchDashboard = new Watch('./src-dashboard/public/bundle.js')
+// const watchDashboard = new Watch('./src-dashboard/public/*')
+watchDashboard.on('all', function (evt, filepath) {
+    console.log('ask dashboard reload !');
     reloadBrowser.reload(); // Fire server-side reload event
 })
 
 
 /*************************************************************/
 /* RELOAD of web page when the description of a test changes */
-watch("./public",{ recursive: true, filter: /test\-description\.json$/}, function (evt, name) {
-    scanTest(path.dirname(name))
-    .then(()=>{
-      console.log('ask browser reload !');
-      reloadBrowser.reload(); // Fire server-side reload evenht TODO : be more specific than reloading the full web page
-    })
-});
+// const watc
+// watch("./public",{ recursive: true, filter: /test\-description\.json$/}, function (evt, name) {
+//     scanTest(path.dirname(name))
+//     .then(()=>{
+//       console.log('ask browser reload !');
+//       reloadBrowser.reload(); // Fire server-side reload evenht TODO : be more specific than reloading the full web page
+//     })
+// });
 
 
 /*************************************************************/
 /* rerun scans when the report is changed                    */
-watch("./src-server/report/dist",{ recursive: false}, function (evt, name) {
+const watchReport = new Watch('./src-server/report/dist/build.js')
+watchReport.on('all', function (evt, filepath) {
     console.log('Report has changed, run all scans and ask browser reload');
     scanTests()
     .then(()=>{
@@ -128,44 +137,94 @@ watch("./src-server/report/dist",{ recursive: false}, function (evt, name) {
 /* INITIAL SCAN of tests folders                             */
 function scanTests() {
   const fileNames = fs.readdirSync('public')
-  return Promise.map(fileNames, file => scanTest('public/'+file), {concurrency:4}) //
+  const prDirectories = glob.sync('*/*/pr-*')
+
+  return Promise.map(prDirectories, dir => {
+    dir = dir.split(path.sep)
+    const match   = dir[1].match(/[\w_]+/g)
+    const project = match[0]
+    const suite   = match[1]
+    const prId    = dir[2] // TODO : parseInt ?
+    // console.log('\nscanTests', project, suite, prId)
+    return scanTest(project, suite, prId, false)
+  }, {concurrency:4})
 }
 
 
 /*************************************************************/
 /* SCAN A DIRECTORY and compare images to produce reports    */
-function scanTest(dirPath, force) {
-  console.log('\nscan', dirPath);
-  var path = dirPath+'/comparison-description.json'
-  var comparisonDescription = {}
-  var testDescription
-  if (fs.existsSync(path)) {
-    comparisonDescription = JSON.parse(fs.readFileSync(path, 'utf8'))
+function scanTest(project, suite, prId, force) {
+  const prPath   = `public/${project}-${suite}/${prId}/`
+  const compPath = `public/${project}-${suite}/${prId}/comparison-description.json`
+  var   comparison = {}
+  var   test
+  console.log('\nSCAN', prPath);
+  if (fs.existsSync(compPath)) {
+    console.log('comparison-description.json loaded');
+    comparison = JSON.parse(fs.readFileSync(compPath, 'utf8'))
   }
-  testDescription = JSON.parse(fs.readFileSync(dirPath+'/test-description.json', 'utf8'))
-  // check if the comparison has already been done (test and comparison must have the same runId)
+  suiteDescription = JSON.parse(fs.readFileSync(`public/${project}-${suite}/suite-description.json`, 'utf8'))
+  // check if the comparison has already been done (test and comparison must have the same beforeVersion)
   // if not, then run a comparison
-  if ((comparisonDescription.runId != testDescription.runId) || force) {
-    console.log('visual Comparison required for', dirPath, testDescription.runId)
+  if ((comparison.beforeVersion != suiteDescription.beforeVersion) || force) {
+    console.log(`Visual Comparison required for ${project}/${suite}/${prId} - ${suiteDescription.beforeVersion}, ${comparison.beforeVersion}`)
     scanInProgress++
-    updateMasked(dirPath)
-    var promise = visualCompare(dirPath, testDescription.runId, testDescription.testId)
+    // updateMasked(dirPath)
+    var promise = visualCompare(project, suite, prId, suiteDescription.beforeVersion)
     promise.then((result)=>{
-        comparisonDescription.isError = result.isError
-        testDescription.isError = result.isError
-        testDescription.hasNew  = result.newItems.length > 0
-        testsDictionnary[testDescription.testId] = testDescription
-        console.log(result.testId, ': à la fin du scan (AVEC scan...) => testDescription.isError ', testDescription.isError);
+        // result.hasNew  = result.newItems.length > 0 // TODO : rôle ?
+        // comparisonsDictionnary[`${project}-${suite}-${prId}`] = comparison
+        // testsDictionnary[`${project}-${suite}`] = test
+        console.log(`${project}-${suite}/${prId} : comparison (AVEC scan) => comparison.isError`, result.isError);
+        addComparison(project, suite, prId, {project, suite, prId, isError: result.isError, title:suiteDescription.title, date:result.date} )
         scanInProgress--
     })
     return promise
   }else{
     // add or update the test to the list
-    testDescription.isError = comparisonDescription.isError
-    testsDictionnary[testDescription.testId] = testDescription
-    console.log('à la fin du scan (sans scan...), testDescription.isError ', testDescription.isError);
-    return comparisonDescription // TODO : not sure that that we should return a resolved promise instead of a value...
+    // test.isError += comparison.isError ? 1 : -1
+    console.log('add to testsDictionnary', `${project}-${suite}-${prId}` );
+    // testsDictionnary[`${project}-${suite}`] = test
+    // comparisonsDictionnary[`${project}-${suite}-${prId}`] = comparison
+    console.log(`${project}-${suite}-${prId} : comparison (SANS scan) => comparison.isError`, comparison.isError);
+    // addComparison(project, suite, prId, comparison)
+    addComparison(project, suite, prId, {project, suite, prId, isError: comparison.isError, title:suiteDescription.title, date:Date.now() })
+    return comparison // TODO : not sure that that we should return a resolved promise instead of a value...
   }
+}
+
+
+/*************************************************************/
+/*  */
+function addComparison (project, suite, prId, comp) {
+  console.log('addComparison', project, suite, prId);
+  var existingPro, existingSuite
+
+  existingPro = comparisonsDictionnary[project]
+  if (!existingPro){
+    existingPro = {}
+    existingSuite={}
+    comparisonsDictionnary[project] = existingPro
+    existingPro[suite]=existingSuite
+    existingSuite[prId]=comp
+    return
+  }
+
+  existingSuite = existingPro[suite]
+  if (!existingSuite) {
+    existingSuite = {}
+    existingPro[suite] = existingSuite
+    existingSuite[prId]=comp
+    return
+  }
+
+  existingSuite[prId] = comp
+
+  // comparisonsDictionnary[`${project}-${suite}-${prId}`] = comparison
+  // comparisonsDictionnary[`${project}-${suite}-${prId}`] = comparison
+  // comparisonsDictionnary[`${project}-${suite}-${prId}`] = comparison
+  // testsDictionnary[`${project}-${suite}`] = test
+  // console.log(`${project}-${suite}-${prId} : comparison (AVEC scan) =>`, test.isError)
 }
 
 
@@ -182,15 +241,17 @@ function updateMasked(dirPath) {
 
 
 /*************************************************************/
-/*  */
-function getTestsList() {
-  console.log('\n___getTestsList - scanInProgress =', scanInProgress);
-  const testsList = []
-  for (var test in testsDictionnary) {
-    testsList.push(testsDictionnary[test])
-  }
-  testsList.sort((a, b)=> a.testId > b.testId )
-  return testsList
+/* return a dictionnary of all the comparisons               */
+/* structure : {project.suite.prId:{comparison}}             */
+function getComparisons() {
+  // console.log('\n___getTestsList - scanInProgress =', scanInProgress);
+  // const testsList = []
+  // for (var test in testsDictionnary) {
+  //   testsList.push(testsDictionnary[test])
+  // }
+  // testsList.sort((a, b)=> a.testId > b.testId )
+  // return testsList
+  return comparisonsDictionnary
 }
 
 
@@ -199,13 +260,17 @@ function getTestsList() {
 server.listen(PORT);
 console.log('Hi! Cozy visual tests dashboard is running on http://localhost:'.magenta + PORT);
 scanTests().then(()=>{
-  console.log('all promises fullfiled');
+  console.log('\n___all promises fullfiled');
+  // console.log('testsDictionnary')
+  // console.log(testsDictionnary)
+  console.log('comparisonsDictionnary')
+  console.log(JSON.stringify(comparisonsDictionnary, null, 2))
   reloadBrowser.reload(); // Fire server-side reload event when all the scans are done.
 })
 
 
 /*************************************************************/
-/* HELPERS          */
+/* HELPERS                                                   */
 function checkAndCreateDir(path) {
   if (!fs.existsSync(path)) {
     fs.mkdirSync(path)

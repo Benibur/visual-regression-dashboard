@@ -103,6 +103,10 @@ yarn test:init
 ```
 
 ### TODO
+* reload du dashboard
+* ouverture du dashboard
+* lien vers une comparaison
+
 * route pour uploader des images
 * route pour uploader les metat data d'un runId
 * route pour récupérer le status d'un run ()
