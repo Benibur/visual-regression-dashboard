@@ -7,7 +7,8 @@ d c<template>
             <img src="../assets/cozy-logo-name-horizontal-blue.svg" alt="Cozy">
           </a>
           <a class="item">
-            <i class="crosshairs icon"></i> Visual test of : {{testId}}
+            <!-- <i class="crosshairs icon"></i> Visual test of : {{testId}} -->
+            <i class="crosshairs icon"></i> Visual test of : {{projectId - suiteId - prId}}
           </a>
 
           <div class="ui simple dropdown item" v-if="failedItems.length">
@@ -137,8 +138,11 @@ export default {
     'item-details'    : ItemDetails,
   },
   data: () => ({
+    // testId      : window['__reg__'].testId                       ,
+    projectId   : window['__reg__'].projectId                    ,
+    suiteId     : window['__reg__'].suiteId                      ,
+    prId        : window['__reg__'].prId                         ,
     actualDir   : window['__reg__'].actualDir                    ,
-    testId      : window['__reg__'].testId                       ,
     expectedDir : window['__reg__'].expectedDir                  ,
     diffDir     : window['__reg__'].diffDir                      ,
     search      : getSearchParams()                              ,
@@ -244,7 +248,7 @@ export default {
       this.passedItems = searchItems('passedItems', getSearchParams()).sort((a,b)=>b.raw<a.raw)
       // 3) request the move of the file in the reference folder
       const req = new XMLHttpRequest()
-      req.open('POST', 'set-as-reference/'+fileName, true)
+      req.open('POST', `/api/${this.projectId}/${this.suiteId}/${this.prId}/set-as-reference/${fileName}`, true)
       req.send(null)
     },
 

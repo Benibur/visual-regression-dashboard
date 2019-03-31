@@ -43,8 +43,8 @@ const createHTMLReport = params => {
   const js       = fs.readFileSync(path.join(__dirname, '../report/dist/build.js'));
   const template = fs.readFileSync(file);
   const json     = {
-    projectId:      params.project,
-    suiteId:        params.suite,
+    projectId:      params.projectId,
+    suiteId:        params.suiteId,
     prId:           params.prId,
     beforeVersion:  params.beforeVersion,
     date:           params.date,
@@ -53,10 +53,10 @@ const createHTMLReport = params => {
     hasDeleted:     params.deletedItems.length > 0,
     hasPassed:      params.passedItems.length  > 0,
     hasFailed:      params.failedItems.length  > 0,
-    newItems:       params.newItems.map(    item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.project, params.suite) })),
-    deletedItems:   params.deletedItems.map(item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.project, params.suite) })),
-    passedItems:    params.passedItems.map( item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.project, params.suite) })),
-    failedItems:    params.failedItems.map( item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.project, params.suite) })),
+    newItems:       params.newItems.map(    item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.projectId, params.suiteId) })),
+    deletedItems:   params.deletedItems.map(item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.projectId, params.suiteId) })),
+    passedItems:    params.passedItems.map( item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.projectId, params.suiteId) })),
+    failedItems:    params.failedItems.map( item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.projectId, params.suiteId) })),
     actualDir:      `${params.urlPrefix}${path.relative(path.dirname(params.report), params.actualDir)}`,
     expectedDir:    `${params.urlPrefix}${path.relative(path.dirname(params.report), params.expectedDir)}`,
     diffDir:        `${params.urlPrefix}${path.relative(path.dirname(params.report), params.diffDir)}`,
@@ -74,8 +74,8 @@ const createHTMLReport = params => {
   return Mustache.render(template.toString(), view);
 };
 
-function hasMask(item, project, suite) {
-  return fs.existsSync(`./public/${project}-${suite}/mask/${item}.json`)
+function hasMask(item, projectId, suiteId) {
+  return fs.existsSync(`./public/${projectId}-${suiteId}/mask/${item}.json`)
 }
 
 function createXimdiffWorker(params) {

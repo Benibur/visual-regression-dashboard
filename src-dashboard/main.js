@@ -67,5 +67,6 @@ resultsViewCtrler.init = ()=>{
 }
 
 goToReport = (comparison) => {
+  console.log(`/report/${comparison.project}-${comparison.suite}/${comparison.prId}/`);
   return () => window.location = `/report/${comparison.project}-${comparison.suite}/${comparison.prId}/`
 }

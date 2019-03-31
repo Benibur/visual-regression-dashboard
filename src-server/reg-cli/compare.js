@@ -1,6 +1,6 @@
-const glob           = require('glob'             ); // $FlowIgnore
-const mkdirp         = require('make-dir'         ); // $FlowIgnore
-const del            = require('del'              ); // $FlowIgnore
+const glob           = require('glob'             );
+const mkdirp         = require('make-dir'         );
+const del            = require('del'              );
 const fs             = require('fs'               );
 const path           = require('path'             );
 const log            = require('./log'            );

@@ -46,8 +46,8 @@ app.use('/report', express.static('public') );
 /* ROUTE to set an image as a reference                      */
 app.post('/api/:projectId/:suiteId/:prId/set-as-reference/:filename', function(req, res) {
   const p = req.params
-  const src  = `public/${p.projectId}-${p.suiteId}/pr-${p.prId}/after/${p.filename}`
-  const diff = `public/${p.projectId}-${p.suiteId}/pr-${p.prId}/diff/${p.filename}`
+  const src  = `public/${p.projectId}-${p.suiteId}/${p.prId}/after/${p.filename}`
+  const diff = `public/${p.projectId}-${p.suiteId}/${p.prId}/diff/${p.filename}`
   const dest = `public/${p.projectId}-${p.suiteId}/before/${p.filename}`
   console.log('ROUTE for set-as-reference',  src);
   fs.copyFileSync(src, dest)
