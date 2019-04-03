@@ -43,7 +43,7 @@ import path     from 'path'
 
 export default {
   name: 'MaskModal',
-  props: ['srcActual', 'srcExpected', 'matching', 'hasMask', 'cancelLabel' ],
+  props: ['srcActual', 'srcExpected', 'matching', 'hasMask', 'cancelLabel', 'sendMaskToServer', 'getMask' ],
   components: {},
   data: function() {
     return {}
@@ -120,9 +120,10 @@ export default {
       canvasF.requestRenderAll()
     },
     saveMask:function () {
-      console.log('saveMask', this.srcActual);
-      console.log(this.srcActual);
-      sendMaskToServer(this.srcActual)
+      const filename = path.basename(this.srcActual)
+      console.log('saveMask', filename)
+      this.sendMaskToServer(filename, getMaskBlob())
+      isSaved = true
       this.cancelLabel = 'Close'
     },
     zoomIn:function () {
@@ -161,9 +162,6 @@ const initCanvas = (url, hasMask, that) => {
   console.log('initCanvas', url);
   console.log('hasMask:', hasMask);
   that.cancelLabel = 'Close'
-  if (hasMask) {
-    getMask(url)
-  }
   // Globals for drag management
   var lastDownInAMask, origX, origY, newRect
   lastDownInAMask = false
@@ -176,6 +174,9 @@ const initCanvas = (url, hasMask, that) => {
     uniScaleTransform : true               ,
     defaultCursor     : 'crosshair'        ,
   })
+  if (hasMask) {
+    that.getMask(path.basename(url), canvasF)
+  }
   fabric.Image.fromURL(url, (oImg)=>{
     console.log('onload image');
     console.log(oImg)
@@ -270,22 +271,18 @@ const getMask = function (url) {
             console.log("Status de getMask la réponse: %d (%s)", this.status, this.statusText);
         }
     }
-};
+  };
   xhr.open('GET', 'mask/'+path.basename(url), true)
   xhr.send(null)
 }
 
-const sendMaskToServer = function (url) {
-  console.log('sendMaskToServer', 'mask/save/'+url);
-  const xhr = new XMLHttpRequest()
-  xhr.open('POST', 'mask/save/'+url, true)
-  xhr.setRequestHeader('Content-type','application/json');
+const getMaskBlob = function () {
+  console.log('getMaskBlob');
   let data = canvasF.toJSON()
   data.objects = data.objects.filter(obj=>(obj.type==='rect' && obj.width>0 && obj.height>0))
   console.log(data);
-  var blob = new Blob([JSON.stringify(data, null, 2)], {type : 'application/json'});
-  xhr.send(blob)
-  isSaved = true
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type : 'application/json'});
+  return blob
 }
 
 function moveY(Y) {

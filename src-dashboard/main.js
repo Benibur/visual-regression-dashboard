@@ -8,7 +8,7 @@ const resultsViewCtrler = {}
 const testedApps        = {}
 const req               = new XMLHttpRequest()
 const resultsContainerV = document.getElementById('results-container')
-var   STORE //  sotre of data, a dictionnary of comparisons {project.suite.prId:{comparison}}
+var   STORE //  sotre of data, a dictionnary of comparisons {projectId.suiteId.prId:{comparison}}
 
 moment.locale('fr');
 
@@ -71,14 +71,22 @@ resultsViewCtrler.init = ()=>{
 
 function sortRows(rows) {
   rows.sort((a,b) => {
-    if(a.suite === b.suite) return (a.prId > b.prId)
-    return (a.suite > b.suite)
+    if(a.suiteId === b.suiteId) return (a.prId > b.prId)
+    return (a.suiteId > b.suiteId)
   })
 }
 
 
 goToReport = (comparison) => {
-  return () => window.location = `/report/${comparison.project}-${comparison.suite}/${comparison.prId}/`
+  return (event) => {
+    if (event.ctrlKey) {
+      window.open(`/report/${comparison.projectId}-${comparison.suiteId}/${comparison.prId}/`)
+    }else {
+      window.location = `/report/${comparison.projectId}-${comparison.suiteId}/${comparison.prId}/`
+    }
+    event.preventDefault()
+    event.stopPropagation()
+  }
 }
 
 
@@ -114,7 +122,6 @@ resultsViewCtrler.hideSuccessRows = (shouldHide) =>{
 const hideSuccessBtn = document.getElementById('hideSuccessBtn')
 const hideSuccessInput = hideSuccessBtn.getElementsByTagName('INPUT')[0]
 hideSuccessBtn.addEventListener('click', (e)=>{
-  console.log('click hideSuccessBtn', hideSuccessInput.checked, e.target)
   if(e.target.nodeName==='LABEL') hideSuccessInput.checked = !hideSuccessInput.checked
   resultsViewCtrler.hideSuccessRows(hideSuccessInput.checked)
 })
@@ -124,7 +131,7 @@ hideSuccessBtn.addEventListener('click', (e)=>{
 /*  VIEW CONTROLER REFRESH A ROW                             */
 resultsViewCtrler.refreshRow = (comp) =>{
   // find row's view
-  const comparison = ((STORE[comp.project] || {})[comp.suite] || {})[comp.prId]
+  const comparison = ((STORE[comp.projectId] || {})[comp.suiteId] || {})[comp.prId]
   if (!comparison){
     console.log('refreshRow of an unexisting row', comp);
     return
@@ -132,7 +139,7 @@ resultsViewCtrler.refreshRow = (comp) =>{
   // update stored data with new data
   comp.view  = comparison.view
   comp.dateF = moment(comp.date).format('YYYY-MM-DD HH[h]mm')
-  STORE[comp.project][comp.suite][comp.prId] = comp
+  STORE[comp.projectId][comp.suiteId][comp.prId] = comp
   // update row's html
   comparison.view.innerHTML = rowTemplate(comp)
 
@@ -150,7 +157,7 @@ refreshComparisonListener = (comparison) => {
 }
 
 refreshComparison = (comparison) => {
-  console.log(`refesh /report/${comparison.project}-${comparison.suite}/${comparison.prId}/`)
+  console.log(`refesh /report/${comparison.projectId}-${comparison.suiteId}/${comparison.prId}/`)
   req.onreadystatechange = function(event) {
       // XMLHttpRequest.DONE === 4
       if (this.readyState === XMLHttpRequest.DONE) {
@@ -162,6 +169,6 @@ refreshComparison = (comparison) => {
           }
       }
   };
-  req.open('POST', `/api/${comparison.project}/${comparison.suite}/${comparison.prId}/refresh`, true);
+  req.open('POST', `/api/${comparison.projectId}/${comparison.suiteId}/${comparison.prId}/refresh`, true);
   req.send(null);
 }

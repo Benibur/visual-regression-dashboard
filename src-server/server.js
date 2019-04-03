@@ -14,7 +14,6 @@ const glob            = require('glob'                          )
 /*************************************************************/
 /* GLOBALS                                                   */
 const PORT                   = 8080
-const testsDictionnary       = {}
 const comparisonsDictionnary = {}
 const app                    = express()
 const server                 = http.createServer(app)
@@ -59,7 +58,29 @@ app.post('/api/:projectId/:suiteId/:prId/set-as-reference/:filename', function(r
   finally {
     console.log('file moved, re-scan the suite on all PRs'); // TODO we should rescan the whole suite, not only the current pr ! ! a queue would be better.
     scanSuite(p.projectId, p.suiteId, true)           // update the comparison TODO : delay in the case where a scan is in progress
-    scanPr(p.projectId, p.suiteId, p.prId, true)           // update the comparison TODO : delay in the case where a scan is in progress
+    .then(()=>{
+      res.send(true)
+    })
+  }
+});
+
+
+/*************************************************************/
+/* ROUTE TO DELETE an image from before                       */
+app.post('/api/:projectId/:suiteId/:prId/delete-from-before/:filename', function(req, res) {
+  const p = req.params
+  const src  = `public/${p.projectId}-${p.suiteId}/before/${p.filename}`
+  const mask = `public/${p.projectId}-${p.suiteId}/mask/${p.filename}.json`
+  console.log('ROUTE for delete-from-before',  src);
+  try {
+    console.log('try delete', src);
+    fs.unlinkSync(src) // delete diff
+    try{fs.unlinkSync(mask)} catch (e){} // delete mask if exists
+  }
+  catch (e) {}
+  finally {
+    console.log('file deleted, re-scan the suite on all PRs'); // TODO we should rescan the whole suite, not only the current pr ! ! a queue would be better.
+    scanSuite(p.projectId, p.suiteId, true)           // update the comparison TODO : delay in the case where a scan is in progress
     .then(()=>{
       res.send(true)
     })
@@ -83,25 +104,31 @@ app.post('/api/:projectId/:suiteId/:prId/refresh', function(req, res) {
 /*************************************************************/
 /* ROUTE to SAVE a MASK                                      */
 app.use(bodyParser.json())
-app.post('/tests/:testId/mask/save/:dir/:filename', function(req, res) {
-  console.log('route for mask/save/ of app',  req.params.testId, '/', req.params.filename);
-  const maskPath = 'public/' + req.params.testId + '/mask/'
+app.post('/api/:projectId/:suiteId/mask/save/:filename', function(req, res) {
+  const p = req.params
+  console.log('route for mask/save/ of app',  p.projectId, '/', p.suiteId);
+  const maskPath = `public/${p.projectId}-${p.suiteId}/mask/`
   checkAndCreateDir(maskPath)
-  fs.writeFileSync(maskPath + req.params.filename + '.json', JSON.stringify(req.body, null, 2))
-  // update the comparison
-  scanPr('public/' + req.params.testId , true)
+  fs.writeFileSync(maskPath + p.filename + '.json', JSON.stringify(req.body, null, 2))
+  // update the comparison of the suite
+  scanSuite(p.projectId, p.suiteId, true)
   .then(()=> res.send(true) )
 });
 
 
 /*************************************************************/
 /* ROUTE to GET a MASK                                      */
-app.get('/tests/:testId/mask/:filename', function(req, res) {
-  console.log('route to get mask of app',  req.params.testId, '/mask/', req.params.filename);
-  const maskPath = 'public/' + req.params.testId + '/mask/'
+app.get('/api/:projectId/:suiteId/mask/:filename', function(req, res) {
+  const p = req.params
+  console.log('route to get mask of app',  `public/${p.projectId}-${p.suiteId}/mask/${p.filename}.json`);
+  const maskPath = `public/${p.projectId}-${p.suiteId}/mask/${p.filename}.json`
   // checkAndCreateDir(maskPath)
-  const json = fs.readFileSync(maskPath + req.params.filename + '.json', 'utf8')
-  res.send(json)
+  if (fs.existsSync(maskPath)) {
+    const json = fs.readFileSync(maskPath , 'utf8')
+    res.send(json)
+  }else {
+    res.sent(false)
+  }
 });
 
 
@@ -149,7 +176,7 @@ watchReport.on('all', function (evt, filepath) {
 /*************************************************************/
 /* INITIAL SCAN of tests folders                             */
 function scanAllProjects() {
-  const fileNames = fs.readdirSync('public')
+  const filenames = fs.readdirSync('public')
   const prDirectories = glob.sync('public/*/pr-*')
   return Promise.map(prDirectories, dir => {
     dir = dir.split(path.sep)
@@ -166,19 +193,23 @@ function scanAllProjects() {
 /*************************************************************/
 /* SCAN ALL THE PRs OF A SUITE                               */
 function scanSuite(projectId, suiteId, force){
-  const prIds = (comparisonsDictionnary[projectId] || {})[suiteId]
-  if (!prIds) return
-  for (var prId in prIds) {
-    scanPr(projectId, suiteId, prId, force)
+  const suite = (comparisonsDictionnary[projectId] || {})[suiteId]
+  if (!suite) return
+  const prIds = []
+  for (var prId in suite) {
+    prIds.push(prId)
   }
+  return Promise.map(prIds, prId => {
+    return scanPr(projectId, suiteId, prId, force)
+  }, {concurrency:4})
 }
 
 
 /*************************************************************/
 /* SCAN A DIRECTORY and compare images to produce reports    */
-function scanPr(project, suite, prId, force) {
-  const prPath   = `public/${project}-${suite}/${prId}/`
-  const compPath = `public/${project}-${suite}/${prId}/comparison-description.json`
+function scanPr(projectId, suiteId, prId, force) {
+  const prPath   = `public/${projectId}-${suiteId}/${prId}/`
+  const compPath = `public/${projectId}-${suiteId}/${prId}/comparison-description.json`
   var   comparison = {}
   var   test
   console.log('\nSCAN', prPath);
@@ -186,48 +217,47 @@ function scanPr(project, suite, prId, force) {
     console.log('comparison-description.json loaded');
     comparison = JSON.parse(fs.readFileSync(compPath, 'utf8'))
   }
-  suiteDescription = JSON.parse(fs.readFileSync(`public/${project}-${suite}/suite-description.json`, 'utf8'))
+  suiteDescription = JSON.parse(fs.readFileSync(`public/${projectId}-${suiteId}/suite-description.json`, 'utf8'))
   // check if the comparison has already been done (test and comparison must have the same beforeVersion)
   // if not, then run a comparison
   if (force || (comparison.beforeVersion != suiteDescription.beforeVersion) ) {
-    console.log(`Visual Comparison required for ${project}/${suite}/${prId} - ${suiteDescription.beforeVersion}, ${comparison.beforeVersion}`)
+    console.log(`Visual Comparison required for ${projectId}/${suiteId}/${prId} - ${suiteDescription.beforeVersion}, ${comparison.beforeVersion}`)
     scanInProgress++
     // updateMasked(dirPath)
-    return visualCompare(project, suite, prId, suiteDescription.beforeVersion)
+    return visualCompare(projectId, suiteId, prId, suiteDescription.beforeVersion)
     .then((compResult)=>{
-      console.log(`${project}-${suite}/${prId} : comparison (AVEC scan) => compResult.hasFailed`, compResult.hasFailed);
+      console.log(`${projectId}-${suiteId}/${prId} : comparison (AVEC scan) => compResult.hasFailed`, compResult.hasFailed);
       const addedComp = {
-        project,
-        suite,
-        prId,
-        hasFailed  : compResult.hasFailed,
-        hasNew     : compResult.hasNew,
-        hasDeleted : compResult.hasDeleted,
-        hasPassed  : compResult.hasPassed,
-        title      : suiteDescription.title,
-        date       : compResult.date,
+        projectId                           ,
+        suiteId                             ,
+        prId                                ,
+        hasFailed  : compResult.hasFailed   ,
+        hasNew     : compResult.hasNew      ,
+        hasDeleted : compResult.hasDeleted  ,
+        hasPassed  : compResult.hasPassed   ,
+        title      : suiteDescription.title ,
+        date       : compResult.date        ,
       }
-      addComparison(project, suite, prId, addedComp)
+      addComparison(projectId, suiteId, prId, addedComp)
       scanInProgress--
       return addedComp
     })
 
   }else{
     // add or update the test to the list
-    console.log('add to testsDictionnary', `${project}-${suite}-${prId}` );
-    console.log(`${project}-${suite}-${prId} : comparison (SANS scan) => comparison.hasFailed`, comparison.hasFailed);
+    console.log(`${projectId}-${suiteId}-${prId} : comparison (SANS scan) => comparison.hasFailed`, comparison.hasFailed);
     const addedComp = {
-      project,
-      suite,
-      prId,
-      hasFailed  : comparison.hasFailed,
-      hasNew     : comparison.hasNew,
-      hasDeleted : comparison.hasDeleted,
-      hasPassed  : comparison.hasPassed,
-      date       : comparison.date,
-      title      : suiteDescription.title,
+      projectId                           ,
+      suiteId                             ,
+      prId                                ,
+      hasFailed  : comparison.hasFailed   ,
+      hasNew     : comparison.hasNew      ,
+      hasDeleted : comparison.hasDeleted  ,
+      hasPassed  : comparison.hasPassed   ,
+      date       : comparison.date        ,
+      title      : suiteDescription.title ,
     }
-    addComparison(project, suite, prId, addedComp)
+    addComparison(projectId, suiteId, prId, addedComp)
     return addedComp // TODO : not sure that that we should return a resolved promise instead of a value...
   }
 }
@@ -235,22 +265,22 @@ function scanPr(project, suite, prId, force) {
 
 /*************************************************************/
 /*  */
-function addComparison (project, suite, prId, comp) {
-  console.log('addComparison', project, suite, prId);
+function addComparison (projectId, suiteId, prId, comp) {
+  console.log('addComparison', projectId, suiteId, prId);
   var existingPro, existingSuite
-  existingPro = comparisonsDictionnary[project]
+  existingPro = comparisonsDictionnary[projectId]
   if (!existingPro){
     existingPro = {}
     existingSuite={}
-    comparisonsDictionnary[project] = existingPro
-    existingPro[suite]=existingSuite
+    comparisonsDictionnary[projectId] = existingPro
+    existingPro[suiteId]=existingSuite
     existingSuite[prId]=comp
     return comp
   }
-  existingSuite = existingPro[suite]
+  existingSuite = existingPro[suiteId]
   if (!existingSuite) {
     existingSuite = {}
-    existingPro[suite] = existingSuite
+    existingPro[suiteId] = existingSuite
     existingSuite[prId]=comp
     return comp
   }

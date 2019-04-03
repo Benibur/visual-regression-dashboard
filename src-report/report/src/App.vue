@@ -92,7 +92,7 @@
     <comparison-modal :src="modalSrc" :srcActual="selectedSrcActual" :srcExpected="selectedSrcExpected" :matching="selectedMatchingResult" :bg="modalBgSrc"></comparison-modal>
 
     <mask-modal :src="modalSrc" :srcActual="selectedSrcActual" :srcExpected="selectedSrcExpected"
-      :matching="selectedMatchingResult" :bg="modalBgSrc" :hasMask="hasMask">
+      :matching="selectedMatchingResult" :bg="modalBgSrc" :hasMask="hasMask"  :sendMaskToServer="sendMaskToServer" :getMask="getMask">
     </mask-modal>
 
   </div>
@@ -137,7 +137,6 @@ export default {
     'item-details'    : ItemDetails,
   },
   data: () => ({
-    // testId      : window['__reg__'].testId                       ,
     projectId   : window['__reg__'].projectId                    ,
     suiteId     : window['__reg__'].suiteId                      ,
     prId        : window['__reg__'].prId                         ,
@@ -177,7 +176,7 @@ export default {
   },
   // mounted: function () {
   //   setTimeout(
-  //     ()=> this.openMask('sample.2.should_be_2_but_1_in_before.png', true) // TODO remove
+  //     ()=> this.openMask('sample.02.should_be_2_but_1_in_before.png', true) // TODO remove
   //     , 10
   //   )
   // },
@@ -211,6 +210,23 @@ export default {
       this.$modal.push('mask')
     },
 
+    getMask(fileName, canvasF){
+      console.log('getMask on top !!!!', `/api/${this.projectId}/${this.suiteId}/mask/${fileName}`);
+      const xhr = new XMLHttpRequest()
+      xhr.onreadystatechange = function(event) {
+        if (this.readyState === XMLHttpRequest.DONE) {
+          if (this.status === 200) {
+            // console.log("Réponse de getMask reçue: %s", this.responseText);
+            canvasF.loadFromJSON(this.responseText)
+          } else {
+            console.log("Status de getMask in app.vue la réponse: %d (%s)", this.status, this.statusText);
+          }
+        }
+      };
+      xhr.open('GET', `/api/${this.projectId}/${this.suiteId}/mask/${fileName}`, true)
+      xhr.send(null)
+    },
+
     onMaskEvent(msg){
       console.log('onMaskEvent', msg);
     },
@@ -227,6 +243,14 @@ export default {
       this.search = e.target.value;
       this.filter(this.search);
       history.pushState('', '', `?search=${encodeURIComponent(this.search)}`);
+    },
+
+    sendMaskToServer(fileName, blob) {
+      console.log('sendMaskToServer', );
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `/api/${this.projectId}/${this.suiteId}/mask/save/${fileName}`, true)
+      xhr.setRequestHeader('Content-type','application/json');
+      xhr.send(blob)
     },
 
     setImageAsReference(fileName) {
@@ -255,8 +279,18 @@ export default {
       ['failedItems', 'passedItems', 'newItems', 'deletedItems'].forEach(type => this[type] = searchItems(type, search));
     }, SEARCH_DEBOUNCE_MSEC),
 
-    deleteItem(file){
-      console.log("request deletion of ", file);
+    deleteItem(fileName){
+      console.log("request deletion of ", fileName);
+      // 1) find the file item
+      const deletedItems = window['__reg__']['deletedItems'].find(item=>item.raw===fileName)
+      // 2) remove file item
+      const newDeletedItems   = window['__reg__']['deletedItems'].filter(item=>item.raw!==fileName)
+      window['__reg__']['deletedItems'] = newDeletedItems
+      this['deletedItems'] = searchItems('deletedItems', getSearchParams())
+      // 3) request the deletion of the file (before) and mask
+      const req = new XMLHttpRequest()
+      req.open('POST', `/api/${this.projectId}/${this.suiteId}/${this.prId}/delete-from-before/${fileName}`, true)
+      req.send(null)
     }
   }
 }
