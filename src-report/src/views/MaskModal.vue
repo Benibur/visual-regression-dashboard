@@ -72,7 +72,6 @@ export default {
       this.$modal.pop();
     },
     reInitCanvas: function (src) {
-      console.log('before initCanvas', src );
       this.$refs.mod.focus()
       initCanvas(this.srcActual, this.hasMask, this)
     },
@@ -125,6 +124,7 @@ export default {
       this.sendMaskToServer(filename, getMaskBlob())
       isSaved = true
       this.cancelLabel = 'Close'
+      this.closeModal()
     },
     zoomIn:function () {
       console.log('zoomIn');
@@ -149,17 +149,12 @@ export default {
 /*************************************************************/
 /* CANVAS MANAGEMENT                                         */
 
-// Globals
+// GLOBALS
 var canvasF, isSaved
 isSaved = true
 
-// const deleteSelectedMask = function () {
-//   console.log('deleteSelectedMask');
-//   canvasF.remove(canvasF.getActiveObject())
-// }
-
 const initCanvas = (url, hasMask, that) => {
-  console.log('initCanvas', url);
+  console.log('\ninitCanvas', url, );
   console.log('hasMask:', hasMask);
   that.cancelLabel = 'Close'
   // Globals for drag management
@@ -178,13 +173,14 @@ const initCanvas = (url, hasMask, that) => {
     that.getMask(path.basename(url), canvasF)
   }
   fabric.Image.fromURL(url, (oImg)=>{
-    console.log('onload image');
+    console.log('onload image', canvasF);
     console.log(oImg)
     oImg.selectable        = false
     oImg.excludeFromExport = true
     oImg.hoverCursor       = 'crosshair'
     canvasF.add(oImg)
     oImg.sendToBack()
+    canvasF.renderAll()
   })
   // Track mouse down coordonnates
   canvasF.on('mouse:down', function(o){
@@ -223,17 +219,6 @@ const initCanvas = (url, hasMask, that) => {
     isSaved = false
     that.cancelLabel = 'Cancel'
   });
-
-  // track if a mask is selected
-  // canvasF.on('selection:created', function(o){
-  //   console.log('selection:created', canvasF.getActiveObjects().length);
-  // })
-  // canvasF.on('selection:updated', function(o){
-  //   console.log('selection:updated', canvasF.getActiveObjects().length);
-  // })
-  // canvasF.on('selection:cleared', function(o){
-  //   console.log('selection:cleared', canvasF.getActiveObjects().length);
-  // })
   canvasF.on('object:moved', function(o){
     console.log('object:moved');
     isSaved = false
@@ -260,27 +245,12 @@ const resizeHtmlCanvas = function () {
   can.height = document.documentElement.clientHeight - 100
 }
 
-const getMask = function (url) {
-  const xhr = new XMLHttpRequest()
-  xhr.onreadystatechange = function(event) {
-    if (this.readyState === XMLHttpRequest.DONE) {
-        if (this.status === 200) {
-            // console.log("Réponse de getMask reçue: %s", this.responseText);
-            canvasF.loadFromJSON(this.responseText)
-        } else {
-            console.log("Status de getMask la réponse: %d (%s)", this.status, this.statusText);
-        }
-    }
-  };
-  xhr.open('GET', 'mask/'+path.basename(url), true)
-  xhr.send(null)
-}
-
 const getMaskBlob = function () {
   console.log('getMaskBlob');
   let data = canvasF.toJSON()
   data.objects = data.objects.filter(obj=>(obj.type==='rect' && obj.width>0 && obj.height>0))
   console.log(data);
+  if (data.objects.length === 0) return false
   const blob = new Blob([JSON.stringify(data, null, 2)], {type : 'application/json'});
   return blob
 }

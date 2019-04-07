@@ -86,7 +86,7 @@
       </item-details>
     </div>
 
-    <capture-modal :src="modalSrc" :bg="modalBgSrc">
+    <capture-modal  :src="modalSrc" class="toto">
     </capture-modal>
 
     <comparison-modal :src="modalSrc" :srcActual="selectedSrcActual" :srcExpected="selectedSrcExpected" :matching="selectedMatchingResult" :bg="modalBgSrc"></comparison-modal>
@@ -100,49 +100,26 @@
 </template>
 
 <script>
-import CaptureModal from './views/CaptureModal.vue';
-import MaskModal from './views/MaskModal.vue';
-import ComparisonModal from './views/ComparisonModal.vue';
-import ItemSummaries from './views/ItemSummaries.vue';
-import ItemDetails from './views/ItemDetails.vue';
+import CaptureModal    from  './views/CaptureModal.vue';
+import ComparisonModal from  './views/ComparisonModal.vue';
+import MaskModal       from  './views/MaskModal.vue';
+import ItemSummaries   from  './views/ItemSummaries.vue';
+import ItemDetails     from  './views/ItemDetails.vue';
+import {fabric}        from  'fabric'
 
-const SEARCH_DEBOUNCE_MSEC = 50;
-const debounce = require('lodash.debounce');
-const path = require('path');
-console.log('app.vue WorkerClient.require');
-const workerClient = require('./worker-client').default;
+const SEARCH_DEBOUNCE_MSEC = 50
+const debounce             = require('lodash.debounce')
+const path                 = require('path')
+const workerClient         = require('./worker-client').default
 
-
-function searchItems(type, search) {
-  return window['__reg__'][type]
-    .filter(item => {
-      const words = search.split(' ');
-      return words.every(w => item.raw.indexOf(w) !== -1);
-    });
-}
-
-function getSearchParams() {
-  const s = location.search.match(/search=(.*?)(&|$)/);
-  if (!s || !s[1]) return "";
-  return decodeURIComponent(s[1]) || "";
-}
-
-export default {
-  name: 'App',
-  components: {
-    'capture-modal'   : CaptureModal,
-    'comparison-modal': ComparisonModal,
-    'mask-modal'      : MaskModal,
-    'item-summaries'  : ItemSummaries,
-    'item-details'    : ItemDetails,
-  },
-  data: () => ({
+function initState () {
+  return {
     projectId   : window['__reg__'].projectId                    ,
     suiteId     : window['__reg__'].suiteId                      ,
     prId        : window['__reg__'].prId                         ,
-    actualDir   : window['__reg__'].actualDir                    ,
-    expectedDir : window['__reg__'].expectedDir                  ,
-    diffDir     : window['__reg__'].diffDir                      ,
+    actualDir   : 'after'                                        ,
+    expectedDir : 'before'                                       ,
+    diffDir     : 'diff'                                         ,
     search      : getSearchParams()                              ,
     modalSrc    : ""                                             ,
     hasMask     : ""                                             ,
@@ -158,7 +135,35 @@ export default {
     selectedSrcExpected          : ""                            ,
     selectedMatchingResult       : null                          ,
     someVariableUnderYourControl : 1                             ,
-  }),
+  }
+}
+
+function searchItems(type, search) {
+  return window['__reg__'][type]
+    .filter(item => {
+      const words = search.split(' ');
+      return words.every(w => item.raw.indexOf(w) !== -1);
+    });
+}
+
+function getSearchParams() {
+  const s = location.search.match(/search=(.*?)(&|$)/);
+  if (!s || !s[1]) return "";
+  return decodeURIComponent(s[1]) || "";
+}
+
+
+
+export default {
+  name: 'App',
+  components: {
+    'capture-modal'   : CaptureModal,
+    'comparison-modal': ComparisonModal,
+    'mask-modal'      : MaskModal,
+    'item-summaries'  : ItemSummaries,
+    'item-details'    : ItemDetails,
+  },
+  data: initState,
   created: function () {
     workerClient.subscribe(data => {
       if (this.lastRequestSequence === data.seq && this.isModalOpen) {
@@ -191,7 +196,8 @@ export default {
     openComparison(src) {
       this.modalSrc = src;
       this.selectedSrcActual   = path.join(this.actualDir   || '', src || '');
-      this.selectedSrcExpected = path.join(this.expectedDir || '', src || '');
+      this.selectedSrcExpected = '../before/' + src
+      console.log('app.vue openComparison', src, this.selectedSrcActual, this.selectedSrcExpected);
       this.lastRequestSequence = workerClient.requestCalc({
         raw: src,
         actualSrc: this.selectedSrcActual,
@@ -211,15 +217,17 @@ export default {
     },
 
     getMask(fileName, canvasF){
-      console.log('getMask on top !!!!', `/api/${this.projectId}/${this.suiteId}/mask/${fileName}`);
       const xhr = new XMLHttpRequest()
       xhr.onreadystatechange = function(event) {
         if (this.readyState === XMLHttpRequest.DONE) {
           if (this.status === 200) {
-            // console.log("Réponse de getMask reçue: %s", this.responseText);
-            canvasF.loadFromJSON(this.responseText)
+            const response = JSON.parse(this.response)
+            response.objects.forEach(obj=>{
+              if (obj.type!=='rect') return
+              canvasF.add(new fabric.Rect(obj))
+            })
           } else {
-            console.log("Status de getMask in app.vue la réponse: %d (%s)", this.status, this.statusText);
+            console.log("Status de getMask in app.vue la réponse:", this.status, this.statusText);
           }
         }
       };
@@ -245,12 +253,34 @@ export default {
       history.pushState('', '', `?search=${encodeURIComponent(this.search)}`);
     },
 
-    sendMaskToServer(fileName, blob) {
-      console.log('sendMaskToServer', );
+    deleteMaskFromServer(filename){
+      console.log('mask deletion requested');
       const xhr = new XMLHttpRequest()
-      xhr.open('POST', `/api/${this.projectId}/${this.suiteId}/mask/save/${fileName}`, true)
+      xhr.open('POST', `/api/${this.projectId}/${this.suiteId}/${this.prId}/mask/delete/${filename}`, true)
+      xhr.setRequestHeader('Content-type','application/json');
+      xhr.send(null)
+    },
+
+    sendMaskToServer(filename, blob) {
+      if (!blob) return this.deleteMaskFromServer(filename)
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `/api/${this.projectId}/${this.suiteId}/${this.prId}/mask/save/${filename}`, true)
       xhr.setRequestHeader('Content-type','application/json');
       xhr.send(blob)
+      xhr.onreadystatechange = ()=>{
+        if (xhr.readyState === XMLHttpRequest.DONE) {
+          if (xhr.status === 200) {
+            // console.log('send mask received response', xhr.response)
+            window['__reg__'] = JSON.parse(xhr.response)
+            this.failedItems  = searchItems('failedItems' , getSearchParams())
+            this.passedItems  = searchItems('passedItems' , getSearchParams())
+            this.newItems     = searchItems('newItems'    , getSearchParams())
+            this.deletedItems = searchItems('deletedItems', getSearchParams())
+          } else {
+            console.log("Status de getMask in app.vue la réponse:", xhr.status, xhr.statusText);
+          }
+        }
+      }
     },
 
     setImageAsReference(fileName) {

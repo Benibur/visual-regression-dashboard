@@ -7,16 +7,16 @@
             <div class="captures">
 
                 <div v-if="diffDir" class="capture" v-on:click="openCapture(createSrc(diffDir, item.encoded), createSrc(actualDir, item.encoded))">
-                    <capture-image :kind="'Diff'" :src="createSrc(diffDir, item.encoded)" :hasMask="item.hasMask" :file="item.encoded" ></capture-image>
+                    <capture-image :kind="'Diff'" :src="'diff/' + item.encoded" :hasMask="item.hasMask" :file="item.encoded" ></capture-image>
                 </div>
 
-                <div v-if="actualDir" class="capture" v-on:click="open(item.encoded, actualDir)">
-                    <capture-image :kind="'After'" :src="createSrc(actualDir, item.encoded)" :shouldDisplaySetAsRef="test()"
+                <div v-if="actualDir" class="capture" v-on:click="open(item.encoded, 'after')">
+                    <capture-image :kind="'After'" :src="'after/' + item.encoded" :shouldDisplaySetAsRef="test()"
                       :file="item.encoded" :setImageAsReference="setImageAsReference" :openMask="openMask" :hasMask="item.hasMask" ></capture-image>
                 </div>
 
-                <div v-if="expectedDir" class="capture" v-on:click="open(item.encoded, expectedDir)">
-                    <capture-image :kind="'Before'" :src="createSrc(expectedDir, item.encoded)" :hasMask="item.hasMask"
+                <div v-if="expectedDir" class="capture" v-on:click="open(item.encoded, '../before')">
+                    <capture-image :kind="'Before'" :src="'../before/' + item.encoded" :hasMask="item.hasMask"
                       :file="item.encoded" :canDeleteItem="itemType==='deletedItem'" :deleteItem="deleteItem"></capture-image>
                 </div>
 
@@ -40,13 +40,13 @@ export default {
   methods: {
     open: function(src, dir) {
       if (this.openComparison) {
-        this.openComparison(src);
+        this.openComparison(src)
       } else {
-        this.openCapture(this.createSrc(dir, src));
+        this.openCapture(this.createSrc(dir, src))
       }
     },
     createSrc: function(dir, file) {
-      return path.join(dir || '', file || '');
+      return path.join(dir || '', file || '')
     },
     test: function() {
       return !!this.shouldDisplaySetAsRef

@@ -4,11 +4,11 @@ const VueLoaderPlugin = require('vue-loader/lib/plugin')
 module.exports = {
   mode: "development",
   entry: {
-    build:  './src-report/report/src/main.js',
-    worker: './src-report/report/src/worker-main.js',
+    build:  './src-report/src/main.js',
+    worker: './src-report/src/worker-main.js',
   },
   output: {
-    path: path.join(__dirname, '/report/dist'),
+    path: path.join(__dirname, '/public'),
     publicPath: '/static',
     filename: '[name].js',
     globalObject: 'this'
@@ -18,7 +18,7 @@ module.exports = {
       {
         test: /\.js$/,
         use: "babel-loader",
-        include: [path.resolve(__dirname, 'report/src')]
+        include: [path.resolve(__dirname, 'src')]
       },
       {
         test: /\.(svg)$/,
@@ -38,7 +38,7 @@ module.exports = {
     ]
   },
   devServer: {
-    contentBase: './report',
+    contentBase: './',
     port: 5555
   },
   plugins: [

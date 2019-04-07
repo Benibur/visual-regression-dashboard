@@ -1,7 +1,7 @@
 <template>
   <div>
     <modal name="capture" disable-backdrop>
-      <div class="wrapper" v-on:click.self="closeModal">
+      <div class="wrapper" v-on:click="closeModal">
         <div class="modal">
           <img :src="src" />
         </div>

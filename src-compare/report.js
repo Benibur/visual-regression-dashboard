@@ -7,7 +7,7 @@ const detectDiff = require('x-img-diff-js')
 const log        = require('./log'        )
 
 const loadFaviconAsDataURL = type => {
-  const fname = path.resolve(__dirname, `../report/assets/favicon_${type}.png`);
+  const fname = path.resolve(__dirname, `../assets/favicon_${type}.png`);
   const buffer = fs.readFileSync(fname);
   return 'data:image/png;base64,' + buffer.toString('base64');
 };
@@ -21,29 +21,53 @@ const encodeFilePath = filePath => {
 
 const createJSONReport = params => {
   console.log('in createJSONReport, beforeVersion', params.beforeVersion);
-  return {
-    beforeVersion: params.beforeVersion,
-    date         : params.date,
-    hasPassed    : params.passedItems.length  > 0,
-    hasFailed    : params.failedItems.length  > 0,
-    hasNew       : params.newItems.length     > 0,
-    hasDeleted   : params.deletedItems.length > 0,
-    failedItems  : params.failedItems,
-    newItems     : params.newItems,
-    deletedItems : params.deletedItems,
-    passedItems  : params.passedItems,
-    expectedItems: params.expectedItems,
-    actualItems  : params.actualItems,
-    diffItems    : params.diffItems,
-    actualDir    : `${params.urlPrefix}${path.relative(path.dirname(params.json), params.actualDir)}`,
-    expectedDir  : `${params.urlPrefix}${path.relative(path.dirname(params.json), params.expectedDir)}`,
-    diffDir      : `${params.urlPrefix}${path.relative(path.dirname(params.json), params.diffDir)}`,
+  // const json = {
+  //   beforeVersion: params.beforeVersion,
+  //   date         : params.date,
+  //   hasPassed    : params.passedItems.length  > 0,
+  //   hasFailed    : params.failedItems.length  > 0,
+  //   hasNew       : params.newItems.length     > 0,
+  //   hasDeleted   : params.deletedItems.length > 0,
+  //   failedItems  : params.failedItems,
+  //   newItems     : params.newItems,
+  //   deletedItems : params.deletedItems,
+  //   passedItems  : params.passedItems,
+  //   expectedItems: params.expectedItems,
+  //   actualItems  : params.actualItems,
+  //   diffItems    : params.diffItems,
+  //   actualDir    : `${params.urlPrefix}${path.relative(path.dirname(params.json), params.actualDir)}`,
+  //   expectedDir  : `${params.urlPrefix}${path.relative(path.dirname(params.json), params.expectedDir)}`,
+  //   diffDir      : `${params.urlPrefix}${path.relative(path.dirname(params.json), params.diffDir)}`,
+  // };
+  const htmlJson = {
+    projectId     : params.projectId,
+    suiteId       : params.suiteId,
+    prId          : params.prId,
+    beforeVersion : params.beforeVersion,
+    date          : params.date,
+    type          : params.failedItems.length === 0 ? 'success' : 'danger',
+    hasPassed     : params.passedItems.length  > 0,
+    hasFailed     : params.failedItems.length  > 0,
+    hasNew        : params.newItems.length     > 0,
+    hasDeleted    : params.deletedItems.length > 0,
+    newItems      : params.newItems.map(    item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.projectId, params.suiteId) })),
+    deletedItems  : params.deletedItems.map(item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.projectId, params.suiteId) })),
+    passedItems   : params.passedItems.map( item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.projectId, params.suiteId) })),
+    failedItems   : params.failedItems.map( item => ({ raw: item, encoded: encodeFilePath(item), hasMask: hasMask(item, params.projectId, params.suiteId) })),
+    actualDir     : `${params.urlPrefix}${path.relative(path.dirname(params.report), params.actualDir)}`,
+    expectedDir   : `${params.urlPrefix}${path.relative(path.dirname(params.report), params.expectedDir)}`,
+    diffDir       : `${params.urlPrefix}${path.relative(path.dirname(params.report), params.diffDir)}`,
+    ximgdiffConfig: {
+      enabled  : params.enableClientAdditionalDetection,
+      workerUrl: `${params.urlPrefix}worker.js`,
+    },
   };
+  return htmlJson
 };
 
 const createHTMLReport = params => {
-  const file     = path.join(__dirname, '../report/template/template.html');
-  const js       = fs.readFileSync(path.join(__dirname, '../report/dist/build.js'));
+  const file     = path.join(__dirname, '../template/template.html');
+  const js       = fs.readFileSync(path.join(__dirname, '../dist.old/build.js'));
   const template = fs.readFileSync(file);
   const json     = {
     projectId     : params.projectId,

@@ -80,9 +80,9 @@ function sortRows(rows) {
 goToReport = (comparison) => {
   return (event) => {
     if (event.ctrlKey) {
-      window.open(`/report/${comparison.projectId}-${comparison.suiteId}/${comparison.prId}/`)
+      window.open(`/report/${comparison.projectId}/${comparison.suiteId}/${comparison.prId}/index.html`)
     }else {
-      window.location = `/report/${comparison.projectId}-${comparison.suiteId}/${comparison.prId}/`
+      window.location = `/report/${comparison.projectId}/${comparison.suiteId}/${comparison.prId}/index.html`
     }
     event.preventDefault()
     event.stopPropagation()

@@ -14,13 +14,14 @@ Prerequisites : node, yarn, webpack (installed globally)
 yarn
 yarn test:init # initiate a ./public with data for test & demo
 yarn server:dev # http://localhost:8080
+yarn server:dev PORT=XXXX # port can be specified
 ```
 ### For production
 Modify the listening port (in `./src-server/server.js )`
 ```shell
 yarn
 yarn mkdir public
-yarn server # http://localhost:8080
+yarn server # http://localhost:8080 or add PORT=XXXX in the CLI
 ```
 
 ## How to add visual tests & screenshots

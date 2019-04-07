@@ -6,22 +6,35 @@ const reload          = require('reload'                        )
 const Watch           = require('gaze'                          ).Gaze
 const fs              = require('fs'                            )
 const Promise         = require('bluebird'                      )
-const visualCompare   = require('../src-report/reg-cli/main.js' )
+const visualCompare   = require('../src-compare/main.js' )
 const bodyParser      = require('body-parser'                   )
 const glob            = require('glob'                          )
 
 
 /*************************************************************/
 /* GLOBALS                                                   */
-const PORT                   = 8080
 const comparisonsDictionnary = {}
 const app                    = express()
 const server                 = http.createServer(app)
+var   PORT                   = 8080
 var   scanInProgress         = 0
 
 
+
 /*************************************************************/
-/* ROUTE to get the comparisons                              */
+/* COMMAND LINE PARAMETERS                                   */
+/* expected parameters                                       */
+/*   - PORT=XXXX                                             */
+process.argv.forEach(function (val, index, array) {// look for PORT=XXXX
+  const CLI_port = /PORT=([\d]+)/.exec(val)
+  if (CLI_port) {
+    PORT = CLI_port[1]
+  }
+});
+
+
+/*************************************************************/
+/* ROUTE to get the COMPARISONS                              */
 /* structure : {project.suite.prId:{comparison}}             */
 app.get('/api/comparisons-list', function(req, res) {
   res.json(getComparisons())
@@ -29,7 +42,7 @@ app.get('/api/comparisons-list', function(req, res) {
 
 
 /*************************************************************/
-/* ROUTE for the dashboard page                              */
+/* ROUTE for the DASHBOARD page                              */
 app.get('/', function(req, res) {
   res.sendFile(path.resolve('src-dashboard/public'));
 });
@@ -37,8 +50,38 @@ app.use(express.static('src-dashboard/public'))
 
 
 /*************************************************************/
-/* ROUTE for the report web pages                              */
-app.use('/report', express.static('public') );
+/* ROUTE for the REPORT index.html web page                  */
+app.use('/report/:projectId/:suiteId/:prId/*.(html|js)', (req, res)=>{
+  const p = req.params
+  res.sendFile(path.resolve(`src-report/public/${p[0]}.${p[1]}`))
+})
+
+
+/*************************************************************/
+/* ROUTE for the REPORT json data                            */
+app.use('/api/:projectId/:suiteId/:prId/data', (req, res)=>{
+  const p = req.params
+  console.log('ROUTE for the report data');
+  res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/comparison-description.json`))
+})
+
+
+/*************************************************************/
+/* ROUTE for the REPORT assets (suite level)                 */
+// app.use('/report', express.static('public') );
+app.use('/report/:projectId/:suiteId/:dir/:filename', (req, res)=>{
+  const p = req.params
+  res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.dir}/${p.filename}`))
+})
+
+
+/*************************************************************/
+/* ROUTE for the REPORT assets  (pr level)                   */
+// app.use('/report', express.static('public') );
+app.use('/report/:projectId/:suiteId/:prId/:dir/:filename', (req, res)=>{
+  const p = req.params
+  res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/${p.dir}/${p.filename}`))
+})
 
 
 /*************************************************************/
@@ -104,7 +147,7 @@ app.post('/api/:projectId/:suiteId/:prId/refresh', function(req, res) {
 /*************************************************************/
 /* ROUTE to SAVE a MASK                                      */
 app.use(bodyParser.json())
-app.post('/api/:projectId/:suiteId/mask/save/:filename', function(req, res) {
+app.post('/api/:projectId/:suiteId/:prId/mask/save/:filename', function(req, res) {
   const p = req.params
   console.log('route for mask/save/ of app',  p.projectId, '/', p.suiteId);
   const maskPath = `public/${p.projectId}-${p.suiteId}/mask/`
@@ -112,7 +155,26 @@ app.post('/api/:projectId/:suiteId/mask/save/:filename', function(req, res) {
   fs.writeFileSync(maskPath + p.filename + '.json', JSON.stringify(req.body, null, 2))
   // update the comparison of the suite
   scanSuite(p.projectId, p.suiteId, true)
-  .then(()=> res.send(true) )
+  .then(()=> {
+    res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/comparison-description.json`))
+  })
+});
+
+
+/*************************************************************/
+/* ROUTE to DELETE a MASK                                    */
+app.use(bodyParser.json())
+app.post('/api/:projectId/:suiteId/:prId/mask/delete/:filename', function(req, res) {
+  const p = req.params
+  console.log('ROUTE for mask/delete/ of app',  p.projectId, '/', p.suiteId, p.filename);
+  const maskPath = `public/${p.projectId}-${p.suiteId}/mask/`
+  checkAndCreateDir(maskPath)
+  fs.unlinkSync(maskPath + p.filename + '.json')
+  // update the comparison of the suite
+  scanSuite(p.projectId, p.suiteId, true)
+  .then(()=> {
+    res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/comparison-description.json`))
+  })
 });
 
 
@@ -162,7 +224,7 @@ watchDashboard.on('all', function (evt, filepath) {
 
 /*************************************************************/
 /* rerun scans when the report is changed                    */
-const watchReport = new Watch('./src-server/report/dist/build.js')
+const watchReport = new Watch('./src-report/public/build.js')
 watchReport.on('all', function (evt, filepath) {
     console.log('Report has changed, run all scans and ask browser reload');
     scanAllProjects()
@@ -221,12 +283,10 @@ function scanPr(projectId, suiteId, prId, force) {
   // check if the comparison has already been done (test and comparison must have the same beforeVersion)
   // if not, then run a comparison
   if (force || (comparison.beforeVersion != suiteDescription.beforeVersion) ) {
-    console.log(`Visual Comparison required for ${projectId}/${suiteId}/${prId} - ${suiteDescription.beforeVersion}, ${comparison.beforeVersion}`)
     scanInProgress++
     // updateMasked(dirPath)
     return visualCompare(projectId, suiteId, prId, suiteDescription.beforeVersion)
     .then((compResult)=>{
-      console.log(`${projectId}-${suiteId}/${prId} : comparison (AVEC scan) => compResult.hasFailed`, compResult.hasFailed);
       const addedComp = {
         projectId                           ,
         suiteId                             ,

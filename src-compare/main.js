@@ -42,7 +42,7 @@ function visualCompare(project, suite, prId, nextBeforeVersion) {
   const prPath         = `public/${project}-${suite}/${prId}/`
   const expectedDir    = `public/${project}-${suite}/before/`
   const json           = prPath + 'comparison-description.json'
-  const report         = prPath + 'index.html'
+  // const report         = prPath + 'index.html'
   const actualDir      = prPath + 'after'
   const diffDir        = prPath + 'diff'   // TODO tests diff directory exists
   const urlPrefix      =
@@ -58,7 +58,7 @@ function visualCompare(project, suite, prId, nextBeforeVersion) {
     suite                                       ,
     prId                                        ,
     nextBeforeVersion                           ,
-    report                                      ,
+    // report                                      ,
     concurrency                     : 4         ,
     update                          : false     ,
     urlPrefix                       : './'      ,
