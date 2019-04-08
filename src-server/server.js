@@ -1,14 +1,15 @@
-const http            = require('http'                          )
-const path            = require('path'                          )
-const express         = require('express'                       )
-const colors          = require('colors'                        )
-const reload          = require('reload'                        )
-const Watch           = require('gaze'                          ).Gaze
-const fs              = require('fs'                            )
-const Promise         = require('bluebird'                      )
-const visualCompare   = require('../src-compare/main.js' )
-const bodyParser      = require('body-parser'                   )
-const glob            = require('glob'                          )
+const http            = require('http'                  )
+const path            = require('path'                  )
+const express         = require('express'               )
+const colors          = require('colors'                )
+const reload          = require('reload'                )
+const Watch           = require('gaze'                  ).Gaze
+const fs              = require('fs'                    )
+const Promise         = require('bluebird'              )
+const visualCompare   = require('../src-compare/main.js')
+const bodyParser      = require('body-parser'           )
+const glob            = require('glob'                  )
+const fabric          = require('fabric'                ).fabric
 
 
 /*************************************************************/
@@ -150,9 +151,15 @@ app.use(bodyParser.json())
 app.post('/api/:projectId/:suiteId/:prId/mask/save/:filename', function(req, res) {
   const p = req.params
   console.log('route for mask/save/ of app',  p.projectId, '/', p.suiteId);
+  // store the mask json file
   const maskPath = `public/${p.projectId}-${p.suiteId}/mask/`
   checkAndCreateDir(maskPath)
-  fs.writeFileSync(maskPath + p.filename + '.json', JSON.stringify(req.body, null, 2))
+  fs.writeFileSync(maskPath + p.filename + '.json', JSON.stringify(req.body))
+  // compute masked images
+  const afterPath = `public/${p.projectId}-${p.suiteId}/${p.prId}/after/${p.filename}`
+  computeMaskedImage(afterPath, req.body)
+  const beforePath = `public/${p.projectId}-${p.suiteId}/before/${p.filename}`
+  computeMaskedImage(beforePath, req.body)
   // update the comparison of the suite
   scanSuite(p.projectId, p.suiteId, true)
   .then(()=> {
@@ -284,7 +291,6 @@ function scanPr(projectId, suiteId, prId, force) {
   // if not, then run a comparison
   if (force || (comparison.beforeVersion != suiteDescription.beforeVersion) ) {
     scanInProgress++
-    // updateMasked(dirPath)
     return visualCompare(projectId, suiteId, prId, suiteDescription.beforeVersion)
     .then((compResult)=>{
       const addedComp = {
@@ -350,22 +356,40 @@ function addComparison (projectId, suiteId, prId, comp) {
 
 
 /*************************************************************/
-/*  */
-function updateMasked(dirPath) {
-  var pngDir = 'after'
-  // for (var f of fs.) {
-  //
-  // }
-  // pngDir = 'before'
-
-}
-
-
-/*************************************************************/
 /* return a dictionnary of all the comparisons               */
 /* structure : {project.suite.prId:{comparison}}             */
 function getComparisons() {
   return comparisonsDictionnary
+}
+
+
+/*************************************************************/
+/*  */
+function computeMaskedImage(filePath, masks){
+  if (!fs.existsSync(filePath)) return
+  console.log('computeMaskedImage', filePath, fabric.createCanvasForNode)
+  const out = fs.createWriteStream(filePath + '.masked.png')
+  const canvas = fabric.createCanvasForNode(null, { width: 200, height: 200 });
+  const text = new fabric.Text('Hello world', {
+    left: 100,
+    top: 100,
+    fill: '#f55',
+    angle: 15
+  });
+  canvas.add(text)
+  const stream = canvas.createPNGStream();
+  stream.on('data', function(chunk) {
+    out.write(chunk);
+  })
+}
+
+
+/*************************************************************/
+/* HELPERS                                                   */
+function checkAndCreateDir(path) {
+  if (!fs.existsSync(path)) {
+    fs.mkdirSync(path)
+  }
 }
 
 
@@ -381,12 +405,3 @@ scanAllProjects().then(()=>{
   console.log(JSON.stringify(comparisonsDictionnary, null, 2))
   reloadBrowser.reload(); // Fire server-side reload event when all the scans are done.
 })
-
-
-/*************************************************************/
-/* HELPERS                                                   */
-function checkAndCreateDir(path) {
-  if (!fs.existsSync(path)) {
-    fs.mkdirSync(path)
-  }
-}

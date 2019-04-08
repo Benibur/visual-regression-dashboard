@@ -9,7 +9,10 @@ This is a node.js server providing :
 ## Install
 
 ###  For development and demo
-Prerequisites : node, yarn, webpack (installed globally)
+Prerequisites :
+* node-canvas has some specific prerequisites, (here for Ubuntu/Debian)[https://github.com/Automattic/node-canvas/wiki/Installation:-Ubuntu-and-other-Debian-based-systems]
+* node, yarn, webpack (installed globally)
+
 ```shell
 yarn
 yarn test:init # initiate a ./public with data for test & demo
@@ -17,12 +20,16 @@ yarn server:dev # http://localhost:8080
 yarn server:dev PORT=XXXX # port can be specified
 ```
 ### For production
-Modify the listening port (in `./src-server/server.js )`
+* Modify the listening port (in `./src-server/server.js )`
+* node-canvas install (here for Ubuntu/Debian)[https://github.com/Automattic/node-canvas/wiki/Installation:-Ubuntu-and-other-Debian-based-systems]
 ```shell
 yarn
 yarn mkdir public
 yarn server # http://localhost:8080 or add PORT=XXXX in the CLI
 ```
+
+### Notes on Fabricjs
+Fabricjs is a javascript library for image editing. On nodejs it uses node-canvas and there are some caveat regardings dependencies versions. It has been tested ok with `node 10.15.3`, `fabricjs ^2.7.0`, `"jsdom": "^13.2.0"` (jsdom version seems important)
 
 ## How to add visual tests & screenshots
 
