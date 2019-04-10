@@ -1,7 +1,7 @@
 <template>
   <div>
     <modal name="comparison" disable-backdrop>
-      <div class="wrapper" v-on:click.self="closeModal">
+      <div class="wrapper" v-on:click.self="closeModal" tabindex="1" v-on:keydown="keyCtrler">
         <div class="comparisonModes">
           <comparisonModeSwitcher v-bind:comparisonModes="comparisonModes" v-model="currentComparisonMode" v-on:input="saveComparisonMode"/>
         </div>
@@ -67,6 +67,14 @@ export default {
     },
     saveComparisonMode: function() {
       window.localStorage.setItem('reg-cli-comparisonMode', this.currentComparisonMode);
+    },
+    keyCtrler:function (event) {
+      console.log(event.key, event.keycode, event.shiftKey)
+      if(event.key === 'Escape'){
+        this.saveMask()
+        event.preventDefault()
+        event.stopPropagation()
+      }
     },
   },
 }

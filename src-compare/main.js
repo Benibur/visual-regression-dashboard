@@ -45,8 +45,8 @@ function visualCompare(project, suite, prId, nextBeforeVersion) {
   // const report         = prPath + 'index.html'
   const actualDir      = prPath + 'after'
   const diffDir        = prPath + 'diff'   // TODO tests diff directory exists
-  const urlPrefix      =
-  console.log('Tests visuels de', prPath);
+  // const urlPrefix      =
+  console.log('visualCompare of :', prPath);
 
   // const observer = compare({
   return compare({
@@ -66,7 +66,7 @@ function visualCompare(project, suite, prId, nextBeforeVersion) {
     thresholdRate                   : Number(0) , // TODO  role ??
     thresholdPixel                  : Number(0) , // TODO  role ??
     enableAntialias                 : false     ,
-    enableClientAdditionalDetection : false
+    enableClientAdditionalDetection : false     ,
   });
 
 }

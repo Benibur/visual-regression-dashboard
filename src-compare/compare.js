@@ -1,45 +1,25 @@
-const glob           = require('glob'             );
-const mkdirp         = require('make-dir'         );
-const del            = require('del'              );
-const fs             = require('fs'               );
-const path           = require('path'             );
-const bluebird       = require('bluebird'         );
-const EventEmitter   = require('events'           );
+const glob           = require('glob'             )
+const mkdirp         = require('make-dir'         )
+const del            = require('del'              )
+const fs             = require('fs'               )
+const path           = require('path'             )
+const bluebird       = require('bluebird'         )
+const EventEmitter   = require('events'           )
 const range          = require('lodash'           ).range
-const log            = require('./log'            );
-const createReport   = require('./report'         );
-const ProcessAdaptor = require('./process-adaptor');
+const log            = require('./log'            )
+const createReport   = require('./report'         )
+const ProcessAdaptor = require('./process-adaptor')
 
 const IMAGE_FILES = '/**/*.+(tiff|jpeg|jpg|gif|png|bmp)';
 
-const difference = (arrA, arrB) => arrA.filter(a => !arrB.includes(a));
+const difference = (arrA, arrB) => arrA.filter(a => !arrB.includes(a))
 
-const copyImages = (actualImages, { expectedDir, actualDir }) => {
-  return Promise.all(
-    actualImages.map(
-      image =>
-        new Promise((resolve, reject) => {
-          try {
-            mkdirp.sync(path.dirname(path.join(expectedDir, image)));
-            const writeStream = fs.createWriteStream(path.join(expectedDir, image));
-            fs.createReadStream(path.join(actualDir, image)).pipe(writeStream);
-            writeStream.on('finish', err => {
-              if (err) reject(err);
-              resolve();
-            });
-          } catch (err) {
-            reject(err);
-          }
-        }),
-    ),
-  );
-};
 
 const compareImages = (
   emitter,
-  { expectedImages, actualImages, dirs, matchingThreshold, thresholdPixel, thresholdRate, concurrency, enableAntialias },
+  { expectedFiles, actualFiles, dirs, matchingThreshold, thresholdPixel, thresholdRate, concurrency, enableAntialias },
 ) => {
-  const images = actualImages.filter(actualImage => expectedImages.includes(actualImage));
+  const images = actualFiles.filter(actualImage => expectedFiles.includes(actualImage));
   concurrency = images.length < 20 ? 1 : concurrency || 4;
   const processes = range(concurrency).map(() => new ProcessAdaptor(emitter));
   return bluebird
@@ -67,10 +47,12 @@ const compareImages = (
     .filter(r => !!r);
 };
 
+
 const cleanupExpectedDir = (expectedDir, changedFiles) => {
   const paths = changedFiles.map(image => path.join(expectedDir, image));
   del(paths);
 };
+
 
 const aggregate = result => {
   const passed = result.filter(r => r.passed).map(r => r.image);
@@ -79,16 +61,24 @@ const aggregate = result => {
   return { passed, failed, diffItems };
 };
 
-const updateExpected = ({ actualDir, expectedDir, diffDir, deletedImages, newImages, diffItems }) => {
-  cleanupExpectedDir(expectedDir, [...deletedImages, ...diffItems]);
-  return copyImages([...newImages, ...diffItems], {
-    actualDir,
-    expectedDir,
-    diffDir,
-  }).then(() => {
-    log.success(`\nAll images are updated. `);
-  });
-};
+
+/*************************************************************/
+/* GET THE "ITEM", ie excluding *.masked.png                 */
+const extractItems = (expectedDir) => {
+  // keep all files except *.masked.png
+  return glob.sync(`${expectedDir}/!(*.masked.png)`).map(p => path.basename(p))
+}
+
+/*************************************************************/
+/* GET THE FILES TO COMPARE, ie including *.masked.png       */
+const extractFilesToCompare = (expectedDir) => {
+  var filesToCompare = glob.sync(`${expectedDir}/*.png`).map(p => path.basename(p))
+  // isolates masked images (*.masked.png)
+  const maskedExpectedImages = filesToCompare.filter(file => file.endsWith('masked.png')).map(f=>f.slice(0,-11))
+  // remove from expected files that have a masked counterpart (img1.png, img1.png.masked.png => remove img1.png)
+  // ie : just keep the file with no mask or the masked version of files.
+  return filesToCompare.filter(file => !maskedExpectedImages.find(mf => mf===file))
+}
 
 
 module.exports = (params) => {
@@ -114,8 +104,17 @@ module.exports = (params) => {
   } = params;
   const dirs           = { actualDir, expectedDir, diffDir };
   const emitter        = new EventEmitter();
-  const expectedImages = glob.sync(`${expectedDir}${IMAGE_FILES}`).map(p => path.relative(expectedDir, p)).map(p => p[0] === path.sep ? p.slice(1) : p);
-  const actualImages   = glob.sync(`${actualDir}${IMAGE_FILES}`  ).map(p => path.relative(actualDir, p)  ).map(p => p[0] === path.sep ? p.slice(1) : p);
+  console.log(expectedDir);
+  // get all png filenames
+  const expectedFiles  = extractFilesToCompare(expectedDir) // exclude *.masked.png
+  const expectedImages = extractItems(expectedDir)          // exclude files have a corresponding *.masked.png
+  const actualFiles    = extractFilesToCompare(actualDir)   // exclude *.masked.png
+  const actualImages   = extractItems(actualDir)            // exclude files have a corresponding *.masked.png
+  // console.log('expectedImages', expectedImages);
+  // console.log('expectedFiles', expectedFiles);
+  // console.log('actualImages', actualImages);
+  // console.log('actualFiles', actualFiles);
+
   const deletedImages  = difference(expectedImages, actualImages);
   const newImages      = difference(actualImages, expectedImages);
   mkdirp.sync(expectedDir);
@@ -123,8 +122,8 @@ module.exports = (params) => {
 
   setImmediate(() => emitter.emit('start'));
   var comp = compareImages(emitter, {
-    expectedImages,
-    actualImages,
+    expectedFiles,
+    actualFiles,
     dirs,
     matchingThreshold,
     thresholdRate: thresholdRate || threshold,
@@ -134,20 +133,24 @@ module.exports = (params) => {
   })
     .then(result => aggregate(result))
     .then(({ passed, failed, diffItems }) => {
+      // console.log('\ncompare resulsts: ');
+      // console.log('passed', passed);
+      // console.log('failed', failed);
+      // console.log('diffItems', diffItems);
       return createReport({
         projectId             : project,
         suiteId               : suite,
         prId                  : prId,
         beforeVersion         : nextBeforeVersion,
         date                  : Date.now(),
-        passedItems           : passed,
-        failedItems           : failed,
+        passedItems           : passed.map( item => item.replace(/\.masked\.png$/, '')),
+        failedItems           : failed.map( item => item.replace(/\.masked\.png$/, '')),
+        diffItems             : diffItems,
         newItems              : newImages,
         deletedItems          : deletedImages,
-        expectedItems         : update ? actualImages : expectedImages,
+        expectedItems         : expectedImages,
         previousExpectedImages: expectedImages,
         actualItems           : actualImages,
-        diffItems,
         json                  : json || './reg.json',
         actualDir,
         expectedDir,
@@ -158,29 +161,16 @@ module.exports = (params) => {
       });
     })
     .then(result => {
-      deletedImages.forEach(image => emitter.emit('compare', { type: 'delete', path: image }));
-      newImages.forEach(image => emitter.emit('compare', { type: 'new', path: image }));
-      if (update) {
-        return updateExpected({
-          actualDir,
-          expectedDir,
-          diffDir,
-          deletedImages,
-          newImages,
-          diffItems: result.diffItems,
-        }).then(() => {
-          emitter.emit('update');
-          return result;
-        });
-      }
-      return result;
+      deletedImages.forEach(image => emitter.emit('compare', { type: 'delete', path: image }))
+      newImages.forEach(image => emitter.emit('compare', { type: 'new', path: image }))
+      return result
     })
     .then(result => {
       emitter.emit('complete', result)
       return result
     })
-    .catch(err => emitter.emit('error', err));
+    .catch(err => emitter.emit('error', err))
 
   // console.log(comp);
-  return comp;
+  return comp
 };

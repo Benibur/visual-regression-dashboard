@@ -82,7 +82,7 @@
       </h2>
       <div class="ui divider"  v-if="passedItems.length"></div>
       <item-details class="items" :icon="'checkmark'" :color="'green'" :items="passedItems" :openCapture="openCapture"
-        :actualDir="actualDir" :setImageAsReference="setImageAsReference">
+        :actualDir="actualDir" :setImageAsReference="setImageAsReference" :openMask="openMask">
       </item-details>
     </div>
 
@@ -224,6 +224,7 @@ export default {
             const response = JSON.parse(this.response)
             response.objects.forEach(obj=>{
               if (obj.type!=='rect') return
+              obj.strokeWidth = 0
               canvasF.add(new fabric.Rect(obj))
             })
           } else {

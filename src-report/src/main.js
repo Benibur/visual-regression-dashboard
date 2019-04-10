@@ -31,6 +31,10 @@ xhr.onreadystatechange = function (event) {
 
       window['__reg__'] = JSON.parse(this.responseText)
 
+      console.log('initial data')
+      console.log(JSON.stringify(window['__reg__'], null, 2));
+
+
       new Vue({
         el: '#app',
         render: h => h(App),

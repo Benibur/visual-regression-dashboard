@@ -7,17 +7,36 @@
             <div class="captures">
 
                 <div v-if="diffDir" class="capture" v-on:click="openCapture(createSrc(diffDir, item.encoded), createSrc(actualDir, item.encoded))">
-                    <capture-image :kind="'Diff'" :src="'diff/' + item.encoded" :hasMask="item.hasMask" :file="item.encoded" ></capture-image>
+                    <capture-image
+                      :kind="'Diff'"
+                      :src="'diff/' + item.encoded + (item.hasMask ? '.masked.png' : '')"
+                      :hasMask="item.hasMask"
+                      :file="item.encoded" >
+                    </capture-image>
                 </div>
 
                 <div v-if="actualDir" class="capture" v-on:click="open(item.encoded, 'after')">
-                    <capture-image :kind="'After'" :src="'after/' + item.encoded" :shouldDisplaySetAsRef="test()"
-                      :file="item.encoded" :setImageAsReference="setImageAsReference" :openMask="openMask" :hasMask="item.hasMask" ></capture-image>
+                    <capture-image :kind="'After'"
+                      :src="'after/' + item.encoded + (item.hasMask ? '.masked.png' : '')"
+                      :shouldDisplaySetAsRef="test()"
+                      :file="item.encoded"
+                      :setImageAsReference="setImageAsReference"
+                      :openMask="openMask"
+                      :hasMask="item.hasMask"
+                      >
+                    </capture-image>
                 </div>
 
                 <div v-if="expectedDir" class="capture" v-on:click="open(item.encoded, '../before')">
-                    <capture-image :kind="'Before'" :src="'../before/' + item.encoded" :hasMask="item.hasMask"
-                      :file="item.encoded" :canDeleteItem="itemType==='deletedItem'" :deleteItem="deleteItem"></capture-image>
+                    <capture-image
+                      :kind="'Before'"
+                      :src="'../before/' + item.encoded + (item.hasMask ? '.masked.png' : '')" 
+                      :hasMask="item.hasMask"
+                      :file="item.encoded"
+                      :canDeleteItem="itemType==='deletedItem'"
+                      :deleteItem="deleteItem"
+                      >
+                    </capture-image>
                 </div>
 
             </div>

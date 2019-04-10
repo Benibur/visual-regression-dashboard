@@ -5,6 +5,7 @@ const colors          = require('colors'                )
 const reload          = require('reload'                )
 const Watch           = require('gaze'                  ).Gaze
 const fs              = require('fs'                    )
+const fsPromise       = require('fs'                    ).promises
 const Promise         = require('bluebird'              )
 const visualCompare   = require('../src-compare/main.js')
 const bodyParser      = require('body-parser'           )
@@ -18,8 +19,12 @@ const comparisonsDictionnary = {}
 const app                    = express()
 const server                 = http.createServer(app)
 var   PORT                   = 8080
-var   scanInProgress         = 0
 
+
+/*************************************************************/
+/* BODY PARSER                                               */
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true }))
 
 
 /*************************************************************/
@@ -32,6 +37,49 @@ process.argv.forEach(function (val, index, array) {// look for PORT=XXXX
     PORT = CLI_port[1]
   }
 });
+
+
+/*************************************************************/
+/* ROUTE to create a new RUN                                 */
+app.post('/api/runs', function(req, res) {
+  console.log('ROUTE to create a new run', req.body)
+  const projectId = req.body.projectName
+  const suiteId   = req.body.suiteName
+  // check project and suite exist
+  const newRunId = checkAndCreateRun(projectId, suiteId)
+  // create a new run
+  res.send(newRunId)
+})
+
+
+/*************************************************************/
+/* ROUTE to get the STATUS of a run                          */
+app.get('/api/runs/:prId/analysis', function(req, res) {
+  console.log('ROUTE to get the STATUS of a RUN', req.body)
+  const projectId = req.body.projectName
+  const suiteId   = req.body.suiteName
+  // check project exists
+
+  // check suite exists
+
+  // create a new run
+  res.send(true)
+})
+
+
+/*************************************************************/
+/* ROUTE to upload a SCREENSHOT                              */
+app.post('/api/runs/:prId/screenshots', function(req, res) {
+  // const projectId = req.body.projectName
+  // const suiteId   = req.body.suiteName
+  console.log('ROUTE to upload a screenshot', req.body)
+  // check project exists
+
+  // check suite exists
+
+  // create a new run
+  res.send(true)
+})
 
 
 /*************************************************************/
@@ -136,7 +184,7 @@ app.post('/api/:projectId/:suiteId/:prId/delete-from-before/:filename', function
 /* ROUTE to refresh the comparison of a PR                   */
 app.post('/api/:projectId/:suiteId/:prId/refresh', function(req, res) {
   const p = req.params
-  console.log('route for refresh comparison :',  `public/${p.projectId}-${p.suiteId}/${p.prId}`);
+  console.log('ROUTE for refresh comparison :',  `public/${p.projectId}-${p.suiteId}/${p.prId}`);
   // update the comparison
   scanPr(p.projectId, p.suiteId, p.prId, true)           // update the comparison TODO : delay in the case where a scan is in progress
   .then((comparison)=>{
@@ -147,41 +195,51 @@ app.post('/api/:projectId/:suiteId/:prId/refresh', function(req, res) {
 
 /*************************************************************/
 /* ROUTE to SAVE a MASK                                      */
-app.use(bodyParser.json())
 app.post('/api/:projectId/:suiteId/:prId/mask/save/:filename', function(req, res) {
-  const p = req.params
-  console.log('route for mask/save/ of app',  p.projectId, '/', p.suiteId);
+  const p        = req.params
+  const promises = []
+  console.log('ROUTE for mask/save/ of app',  p.projectId, '/', p.suiteId);
   // store the mask json file
-  const maskPath = `public/${p.projectId}-${p.suiteId}/mask/`
-  checkAndCreateDir(maskPath)
-  fs.writeFileSync(maskPath + p.filename + '.json', JSON.stringify(req.body))
-  // compute masked images
-  const afterPath = `public/${p.projectId}-${p.suiteId}/${p.prId}/after/${p.filename}`
-  computeMaskedImage(afterPath, req.body)
-  const beforePath = `public/${p.projectId}-${p.suiteId}/before/${p.filename}`
-  computeMaskedImage(beforePath, req.body)
-  // update the comparison of the suite
-  scanSuite(p.projectId, p.suiteId, true)
-  .then(()=> {
-    res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/comparison-description.json`))
-  })
-});
+  const suitePath = `public/${p.projectId}-${p.suiteId}/`
+  checkAndCreateDir(suitePath + 'mask/')
+  const promise1 = fsPromise.writeFile(suitePath + 'mask/' + p.filename + '.json', JSON.stringify(req.body))
+  promises.push(promise1)
+  // compute masked images (in /before and all the /after directories)
+  const masks = req.body.objects
+  const beforePath = `${suitePath}/before/${p.filename}`
+  promises.push( computeMaskedImage(beforePath, masks) )
+  const afterPaths  = glob.sync(`${suitePath}*/after/${p.filename}`) // get all /after path and create a promise for each
+  for (afterPath of afterPaths) {
+    promises.push( computeMaskedImage(afterPath, masks) )
+  }
+  console.log('afterPaths', afterPaths)
+  Promise.all(promises)
+  // update all the comparisons of the suite
+  .then(()=> scanSuite(p.projectId, p.suiteId, true) )
+  .then(()=> res.sendFile(path.resolve(`${suitePath}/${p.prId}/comparison-description.json`)) )
+})
 
 
 /*************************************************************/
 /* ROUTE to DELETE a MASK                                    */
-app.use(bodyParser.json())
 app.post('/api/:projectId/:suiteId/:prId/mask/delete/:filename', function(req, res) {
   const p = req.params
   console.log('ROUTE for mask/delete/ of app',  p.projectId, '/', p.suiteId, p.filename);
-  const maskPath = `public/${p.projectId}-${p.suiteId}/mask/`
-  checkAndCreateDir(maskPath)
-  fs.unlinkSync(maskPath + p.filename + '.json')
-  // update the comparison of the suite
-  scanSuite(p.projectId, p.suiteId, true)
-  .then(()=> {
-    res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/comparison-description.json`))
-  })
+  const suitePath = `public/${p.projectId}-${p.suiteId}/`
+  checkAndCreateDir(suitePath)
+  const promises = []
+
+  var pathsToDelete = []
+  pathsToDelete.push(`${suitePath}mask/${p.filename}.json`)
+  pathsToDelete.push(`${suitePath}before/${p.filename}.masked.png`)
+  const afterPaths = glob.sync(`${suitePath}*/@(after|diff)/${p.filename}.masked.png`)
+  pathsToDelete = pathsToDelete.concat(afterPaths)
+  pathsToDelete.forEach(p => promises.push(fsPromise.unlink(p).catch(() => {})) )
+  Promise.all(promises)
+  .then( () => scanSuite(p.projectId, p.suiteId, true))
+  .then( () => {
+      res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/comparison-description.json`))
+    })
 });
 
 
@@ -189,14 +247,14 @@ app.post('/api/:projectId/:suiteId/:prId/mask/delete/:filename', function(req, r
 /* ROUTE to GET a MASK                                      */
 app.get('/api/:projectId/:suiteId/mask/:filename', function(req, res) {
   const p = req.params
-  console.log('route to get mask of app',  `public/${p.projectId}-${p.suiteId}/mask/${p.filename}.json`);
+  console.log('ROUTE to get mask of app',  `public/${p.projectId}-${p.suiteId}/mask/${p.filename}.json`);
   const maskPath = `public/${p.projectId}-${p.suiteId}/mask/${p.filename}.json`
   // checkAndCreateDir(maskPath)
   if (fs.existsSync(maskPath)) {
     const json = fs.readFileSync(maskPath , 'utf8')
     res.send(json)
   }else {
-    res.sent(false)
+    res.send(false)
   }
 });
 
@@ -233,13 +291,8 @@ watchDashboard.on('all', function (evt, filepath) {
 /* rerun scans when the report is changed                    */
 const watchReport = new Watch('./src-report/public/build.js')
 watchReport.on('all', function (evt, filepath) {
-    console.log('Report has changed, run all scans and ask browser reload');
-    scanAllProjects()
-    .then(()=>{
-      console.log('reports rescanned, let\'s refresh');
-      reloadBrowser.reload(); // Fire server-side reload evenht TODO : be more specific than reloading the full web page
-    })
-});
+  console.log('Report has changed, reload browsers')
+})
 
 
 /*************************************************************/
@@ -275,22 +328,20 @@ function scanSuite(projectId, suiteId, force){
 
 
 /*************************************************************/
-/* SCAN A DIRECTORY and compare images to produce reports    */
+/* SCAN A PR DIRECTORY and compare images to produce reports */
 function scanPr(projectId, suiteId, prId, force) {
-  const prPath   = `public/${projectId}-${suiteId}/${prId}/`
-  const compPath = `public/${projectId}-${suiteId}/${prId}/comparison-description.json`
+  const prPath     = `public/${projectId}-${suiteId}/${prId}/`
+  const compPath   = `public/${projectId}-${suiteId}/${prId}/comparison-description.json`
   var   comparison = {}
   var   test
-  console.log('\nSCAN', prPath);
+  console.log('\nSCAN PR', prPath);
   if (!force && fs.existsSync(compPath)) {
-    console.log('comparison-description.json loaded');
     comparison = JSON.parse(fs.readFileSync(compPath, 'utf8'))
   }
   suiteDescription = JSON.parse(fs.readFileSync(`public/${projectId}-${suiteId}/suite-description.json`, 'utf8'))
   // check if the comparison has already been done (test and comparison must have the same beforeVersion)
   // if not, then run a comparison
   if (force || (comparison.beforeVersion != suiteDescription.beforeVersion) ) {
-    scanInProgress++
     return visualCompare(projectId, suiteId, prId, suiteDescription.beforeVersion)
     .then((compResult)=>{
       const addedComp = {
@@ -305,7 +356,6 @@ function scanPr(projectId, suiteId, prId, force) {
         date       : compResult.date        ,
       }
       addComparison(projectId, suiteId, prId, addedComp)
-      scanInProgress--
       return addedComp
     })
 
@@ -364,23 +414,37 @@ function getComparisons() {
 
 
 /*************************************************************/
-/*  */
+/*  Apply a mask to a .png and                               */
+/*  save resulting file in *.png.masked.png                  */
 function computeMaskedImage(filePath, masks){
-  if (!fs.existsSync(filePath)) return
-  console.log('computeMaskedImage', filePath, fabric.createCanvasForNode)
-  const out = fs.createWriteStream(filePath + '.masked.png')
-  const canvas = fabric.createCanvasForNode(null, { width: 200, height: 200 });
-  const text = new fabric.Text('Hello world', {
-    left: 100,
-    top: 100,
-    fill: '#f55',
-    angle: 15
-  });
-  canvas.add(text)
-  const stream = canvas.createPNGStream();
-  stream.on('data', function(chunk) {
-    out.write(chunk);
+  console.log('computeMaskedImage', filePath)
+  if (!fs.existsSync(filePath)) return false
+  return new Promise((resolve, reject) => {
+    fabric.Image.fromURL(filePath, function(img) {
+      const out = fs.createWriteStream(filePath + '.masked.png')
+      const canvas = new fabric.StaticCanvas(null, { width: img.width, height: img.height })
+      canvas.add(img)
+      for (var i = 0; i < masks.length; i++) {
+        var mask = masks[i]
+        mask.strokeWidth = 0
+        mask.fill = 'red'
+        canvas.add( new fabric.Rect(mask) )
+      }
+      canvas.renderAll()
+      const stream = canvas.createPNGStream()
+      stream.pipe(out)
+      stream.on('end', () => resolve() )
+    })
   })
+}
+
+
+/*************************************************************/
+/* HELPERS                                                   */
+function checkAndCreateRun(projectId, suiteId){
+  if (!comparisonsDictionnary[projectId]) {
+
+  }
 }
 
 
@@ -398,10 +462,8 @@ function checkAndCreateDir(path) {
 server.listen(PORT);
 console.log('Hi! Cozy visual tests dashboard is running on http://localhost:'.magenta + PORT);
 scanAllProjects().then(()=>{
-  console.log('\n___all promises fullfiled');
-  // console.log('testsDictionnary')
-  // console.log(testsDictionnary)
-  console.log('comparisonsDictionnary')
-  console.log(JSON.stringify(comparisonsDictionnary, null, 2))
+  console.log('\n___all promises fullfiled')
+  // console.log('comparisonsDictionnary')
+  // console.log(JSON.stringify(comparisonsDictionnary, null, 2))
   reloadBrowser.reload(); // Fire server-side reload event when all the scans are done.
 })

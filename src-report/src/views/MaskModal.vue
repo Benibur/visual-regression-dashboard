@@ -76,14 +76,20 @@ export default {
       initCanvas(this.srcActual, this.hasMask, this)
     },
     keyCtrler:function (event) {
-      console.log(event.key, event.keycode, event.shiftKey)
-      if(event.key === 'Delete'){
-        this.deleteSelectedMask()
+      // console.log(event.key, event.keycode, event.shiftKey)
+      if(event.key === 'Enter' && event.ctrlKey){
+        this.saveMask()
+        event.preventDefault()
+        event.stopPropagation()
       }else if (event.key === 'Escape') {
-        // this.unSelectedMask()
-        console.log('discardActiveObject');
-        canvasF.discardActiveObject()
-        canvasF.requestRenderAll()
+        if (canvasF.getActiveObject()) {
+          canvasF.discardActiveObject()
+          canvasF.requestRenderAll()
+        }else {
+          this.closeModal()
+        }
+      }else if (event.key === 'Delete') {
+        this.deleteSelectedMask()
       }else if (event.key==='ArrowRight') {
         if (event.shiftKey || event.ctrlKey) {
           modifyWidth(1)
@@ -214,6 +220,7 @@ const initCanvas = (url, hasMask, that) => {
       transparentCorners : true                ,
       lockRotation       : false               ,
       hoverCursor        : 'grab'              ,
+      strokeWidth        : 0                   ,
     });
     canvasF.add(newRect).setActiveObject(newRect)
     isSaved = false
