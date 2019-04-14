@@ -9,11 +9,11 @@ This is a node.js server providing :
 
 ## Install
 
-###  For development and demo
-Prerequisites :
+### Prerequisites
 * node-canvas has some specific prerequisites, (here for Ubuntu/Debian)[https://github.com/Automattic/node-canvas/wiki/Installation:-Ubuntu-and-other-Debian-based-systems]
 * node, yarn, webpack (installed globally)
 
+###  For development and demo
 ```shell
 yarn
 yarn test:init # initiate a ./public with data for test & demo
@@ -29,13 +29,9 @@ yarn server PORT=XXX # http://localhost:XXXX
 ```
 
 
-### Notes on Fabricjs
-Fabricjs is a javascript library for image editing. On nodejs it uses node-canvas and there are some caveat regardings dependencies versions. It has been tested ok with `node 10.15.3`, `fabricjs ^2.7.0`, `"jsdom": "^13.2.0"` (jsdom version seems important)
-
-
 ## How to add visual tests & screenshots
 
-### Create a PR
+### API
 TO BE COMPLETED
 
 
@@ -123,11 +119,14 @@ yarn test:init && yarn server:dev
 }
 ```
 
-## Note pour tests avec testcafe :
+### Notes on Fabricjs
+Fabricjs is a javascript library for image editing. On nodejs it uses node-canvas and there are some caveat regardings dependencies versions. It has been tested ok with `node 10.15.3`, `fabricjs ^2.7.0`, `"jsdom": "^13.2.0"` (jsdom version seems important)
+
+### Note pour tests avec testcafe :
 - installation de chrome dans debian : https://blog.tfrichet.fr/installer-google-chrome-sur-debian-8-jessie/
 
 
-### TODO
+## TODO
 * lien avec la pr : je suis pour avoir un lien vers les pr : on ne garde qu'un "run" par PR, on peut mettre le lien du test vers la PR dans github, et on peut tester le statut d'une pr (si fermée depuis longtemps : je supprime le test automatiquement)
 * route pour supprimer les run de PR. Attention, que doit on faire d'une suite quand il n'y a plus de pr ? faut il supprimer la suite, et donc ses masques et les screenshots validés ?
 * possibilité de mettre des paramètres de comparaison par image.
