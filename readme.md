@@ -25,7 +25,7 @@ yarn server:dev PORT=XXXX # port can be specified
 * node-canvas install (here for Ubuntu/Debian)[https://github.com/Automattic/node-canvas/wiki/Installation:-Ubuntu-and-other-Debian-based-systems]
 ```shell
 yarn
-yarn server PORT=XXX # http://localhost:XXXX
+yarn server PORT=XXXX # http://localhost:XXXX
 ```
 
 
@@ -47,13 +47,13 @@ The service is composed of 4 mains parts :
 
 ### All the commands :
 ```bash
-yarn server [PORT=xxx] # starts the server [optionnal : precise port]
-yarn server:dev        # start server in watch mode
-yarn report:build      # builds the report
-yarn report:dev        # builds the report in watch mode
-yanr dashboard:build   # builds the dashboard
-yanr dashboard:dev     # builds the dashboard in watch mode
-yarn test:init         # copy ./test/public in ./public
+yarn server [PORT=xxx]   # starts the server [optionnal :  port]
+yarn server:dev          # start server in watch mode
+yarn report:build        # builds the report
+yarn report:dev          # builds the report in watch mode
+yanr dashboard:build     # builds the dashboard
+yanr dashboard:dev       # builds the dashboard in watch mode
+yarn test:init           # copy ./test/public in ./public
 ```
 
 ### Typical development workflow
@@ -67,8 +67,6 @@ yarn dashboar:dev
 yarn server:dev
 # now let's code
 # and from time to time re init the process : kill your server and
-yarn test:init
-#  repeat as many times as you want :-)
 yarn test:init && yarn server:dev
 #  repeat as many times as you want :-)
 ```
