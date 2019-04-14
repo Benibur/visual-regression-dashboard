@@ -1,6 +1,8 @@
 {
     "projectId": "Note",
     "suiteId": "0001",
+    "projectName": "The Note project",
+    "suiteName": "Deletion of a note 1",
     "beforeVersion": 2,
-    "title": "Test for masks"
+    "title": "title for note 1"
 }

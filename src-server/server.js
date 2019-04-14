@@ -11,14 +11,17 @@ const visualCompare   = require('../src-compare/main.js')
 const bodyParser      = require('body-parser'           )
 const glob            = require('glob'                  )
 const fabric          = require('fabric'                ).fabric
+const shorthash       = require('shorthash'             ).unique
+const multer          = require('multer'                )
 
 
 /*************************************************************/
 /* GLOBALS                                                   */
-const comparisonsDictionnary = {}
-const app                    = express()
-const server                 = http.createServer(app)
-var   PORT                   = 8080
+const comparisonsDictionnary     = {}
+const comparisonsDictionnaryByPr = {}
+const app                        = express()
+const server                     = http.createServer(app)
+var   PORT                       = 8080
 
 
 /*************************************************************/
@@ -36,49 +39,58 @@ process.argv.forEach(function (val, index, array) {// look for PORT=XXXX
   if (CLI_port) {
     PORT = CLI_port[1]
   }
-});
+})
 
 
 /*************************************************************/
 /* ROUTE to create a new RUN                                 */
 app.post('/api/runs', function(req, res) {
-  console.log('ROUTE to create a new run', req.body)
-  const projectId = req.body.projectName
-  const suiteId   = req.body.suiteName
-  // check project and suite exist
-  const newRunId = checkAndCreateRun(projectId, suiteId)
+  console.log('REQUEST to create a new run', req.body)
+  // check project and suite exists, and create a new run
+  const newRunId = checkAndCreateRun(req.body.projectName, req.body.suiteName)
   // create a new run
-  res.send(newRunId)
+  res.send({id:newRunId})
 })
 
 
 /*************************************************************/
 /* ROUTE to get the STATUS of a run                          */
+/* a comparison of is run before sending the status          */
 app.get('/api/runs/:prId/analysis', function(req, res) {
-  console.log('ROUTE to get the STATUS of a RUN', req.body)
-  const projectId = req.body.projectName
-  const suiteId   = req.body.suiteName
-  // check project exists
-
-  // check suite exists
-
-  // create a new run
-  res.send(true)
+  console.log('REQUEST to get the STATUS of a RUN', req.params.prId)
+  const comp = comparisonsDictionnaryByPr[req.params.prId]
+  // rescan the pr
+  scanPr(comp.projectId, comp.suiteId, comp.prId, true)
+  .then((comp)=>{
+    // then return status
+    if (comp.hasFailed || comp.hasDeleted || comp.hasNew ) {
+      res.send('pending')
+    }else {
+      res.send('accepted')
+    }
+  })
 })
 
 
 /*************************************************************/
 /* ROUTE to upload a SCREENSHOT                              */
-app.post('/api/runs/:prId/screenshots', function(req, res) {
-  // const projectId = req.body.projectName
-  // const suiteId   = req.body.suiteName
-  console.log('ROUTE to upload a screenshot', req.body)
-  // check project exists
-
-  // check suite exists
-
-  // create a new run
-  res.send(true)
+/* Does NOT launch a scanPr                                  */
+app.post('/api/runs/:prId/screenshots', function(req, res, next) {
+  console.log('REQUEST to upload a screenshot', req.params.prId)
+  const comp = comparisonsDictionnaryByPr[req.params.prId]
+  // we user the multer middleware to parse the form-data and store the uploaded file
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, `./public/${comp.projectId}-${comp.suiteId}/${comp.prId}/after`)
+    },
+    filename: function (req, file, cb) {
+      cb(null, file.originalname)
+    }
+  })
+  const upload = multer({storage}).single('file')
+  upload(req, res, function(err) {
+    res.end('File is uploaded')
+	})
 })
 
 
@@ -110,14 +122,13 @@ app.use('/report/:projectId/:suiteId/:prId/*.(html|js)', (req, res)=>{
 /* ROUTE for the REPORT json data                            */
 app.use('/api/:projectId/:suiteId/:prId/data', (req, res)=>{
   const p = req.params
-  console.log('ROUTE for the report data');
-  res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/comparison-description.json`))
+  console.log('REQUEST for the report data');
+  res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/comparison-result.json`))
 })
 
 
 /*************************************************************/
-/* ROUTE for the REPORT assets (suite level)                 */
-// app.use('/report', express.static('public') );
+/* ROUTE for the REPORT assets                               */
 app.use('/report/:projectId/:suiteId/:dir/:filename', (req, res)=>{
   const p = req.params
   res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.dir}/${p.filename}`))
@@ -126,7 +137,6 @@ app.use('/report/:projectId/:suiteId/:dir/:filename', (req, res)=>{
 
 /*************************************************************/
 /* ROUTE for the REPORT assets  (pr level)                   */
-// app.use('/report', express.static('public') );
 app.use('/report/:projectId/:suiteId/:prId/:dir/:filename', (req, res)=>{
   const p = req.params
   res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/${p.dir}/${p.filename}`))
@@ -140,7 +150,7 @@ app.post('/api/:projectId/:suiteId/:prId/set-as-reference/:filename', function(r
   const src  = `public/${p.projectId}-${p.suiteId}/${p.prId}/after/${p.filename}`
   const diff = `public/${p.projectId}-${p.suiteId}/${p.prId}/diff/${p.filename}`
   const dest = `public/${p.projectId}-${p.suiteId}/before/${p.filename}`
-  console.log('ROUTE for set-as-reference',  src);
+  console.log('REQUEST for set-as-reference',  src);
   fs.copyFileSync(src, dest)
   try {
     console.log('try delete', diff);
@@ -163,7 +173,7 @@ app.post('/api/:projectId/:suiteId/:prId/delete-from-before/:filename', function
   const p = req.params
   const src  = `public/${p.projectId}-${p.suiteId}/before/${p.filename}`
   const mask = `public/${p.projectId}-${p.suiteId}/mask/${p.filename}.json`
-  console.log('ROUTE for delete-from-before',  src);
+  console.log('REQUEST for delete-from-before',  src);
   try {
     console.log('try delete', src);
     fs.unlinkSync(src) // delete diff
@@ -184,7 +194,7 @@ app.post('/api/:projectId/:suiteId/:prId/delete-from-before/:filename', function
 /* ROUTE to refresh the comparison of a PR                   */
 app.post('/api/:projectId/:suiteId/:prId/refresh', function(req, res) {
   const p = req.params
-  console.log('ROUTE for refresh comparison :',  `public/${p.projectId}-${p.suiteId}/${p.prId}`);
+  console.log('REQUEST for refresh comparison :',  `public/${p.projectId}-${p.suiteId}/${p.prId}`);
   // update the comparison
   scanPr(p.projectId, p.suiteId, p.prId, true)           // update the comparison TODO : delay in the case where a scan is in progress
   .then((comparison)=>{
@@ -198,7 +208,7 @@ app.post('/api/:projectId/:suiteId/:prId/refresh', function(req, res) {
 app.post('/api/:projectId/:suiteId/:prId/mask/save/:filename', function(req, res) {
   const p        = req.params
   const promises = []
-  console.log('ROUTE for mask/save/ of app',  p.projectId, '/', p.suiteId);
+  console.log('REQUEST for mask/save/ of app',  p.projectId, '/', p.suiteId);
   // store the mask json file
   const suitePath = `public/${p.projectId}-${p.suiteId}/`
   checkAndCreateDir(suitePath + 'mask/')
@@ -216,7 +226,7 @@ app.post('/api/:projectId/:suiteId/:prId/mask/save/:filename', function(req, res
   Promise.all(promises)
   // update all the comparisons of the suite
   .then(()=> scanSuite(p.projectId, p.suiteId, true) )
-  .then(()=> res.sendFile(path.resolve(`${suitePath}/${p.prId}/comparison-description.json`)) )
+  .then(()=> res.sendFile(path.resolve(`${suitePath}/${p.prId}/comparison-result.json`)) )
 })
 
 
@@ -224,7 +234,7 @@ app.post('/api/:projectId/:suiteId/:prId/mask/save/:filename', function(req, res
 /* ROUTE to DELETE a MASK                                    */
 app.post('/api/:projectId/:suiteId/:prId/mask/delete/:filename', function(req, res) {
   const p = req.params
-  console.log('ROUTE for mask/delete/ of app',  p.projectId, '/', p.suiteId, p.filename);
+  console.log('REQUEST for mask/delete/ of app',  p.projectId, '/', p.suiteId, p.filename);
   const suitePath = `public/${p.projectId}-${p.suiteId}/`
   checkAndCreateDir(suitePath)
   const promises = []
@@ -238,7 +248,7 @@ app.post('/api/:projectId/:suiteId/:prId/mask/delete/:filename', function(req, r
   Promise.all(promises)
   .then( () => scanSuite(p.projectId, p.suiteId, true))
   .then( () => {
-      res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/comparison-description.json`))
+      res.sendFile(path.resolve(`public/${p.projectId}-${p.suiteId}/${p.prId}/comparison-result.json`))
     })
 });
 
@@ -247,7 +257,7 @@ app.post('/api/:projectId/:suiteId/:prId/mask/delete/:filename', function(req, r
 /* ROUTE to GET a MASK                                      */
 app.get('/api/:projectId/:suiteId/mask/:filename', function(req, res) {
   const p = req.params
-  console.log('ROUTE to get mask of app',  `public/${p.projectId}-${p.suiteId}/mask/${p.filename}.json`);
+  console.log('REQUEST to get mask of app',  `public/${p.projectId}-${p.suiteId}/mask/${p.filename}.json`);
   const maskPath = `public/${p.projectId}-${p.suiteId}/mask/${p.filename}.json`
   // checkAndCreateDir(maskPath)
   if (fs.existsSync(maskPath)) {
@@ -259,6 +269,13 @@ app.get('/api/:projectId/:suiteId/mask/:filename', function(req, res) {
 });
 
 
+// /*************************************************************/
+// /* ROUTE to for all other requests                           */
+// app.all('/*', function(req, res) {
+//   console.log('UNEXPECTED REQUEST :', req.method, req.originalUrl )
+// })
+
+
 /*************************************************************/
 /* BROWSER RELOADER                                          */
 reloadBrowser = reload(app)
@@ -268,7 +285,6 @@ reloadBrowser = reload(app)
 /* RELOAD web page when the dashboard code changes           */
 /* (for ease of dev)                                         */
 const watchDashboard = new Watch('./src-dashboard/public/bundle.js')
-// const watchDashboard = new Watch('./src-dashboard/public/*')
 watchDashboard.on('all', function (evt, filepath) {
     console.log('ask dashboard reload !');
     reloadBrowser.reload(); // Fire server-side reload event
@@ -276,19 +292,7 @@ watchDashboard.on('all', function (evt, filepath) {
 
 
 /*************************************************************/
-/* RELOAD of web page when the description of a test changes */
-// const watc
-// watch("./public",{ recursive: true, filter: /test\-description\.json$/}, function (evt, name) {
-//     scanPr(path.dirname(name))
-//     .then(()=>{
-//       console.log('ask browser reload !');
-//       reloadBrowser.reload(); // Fire server-side reload evenht TODO : be more specific than reloading the full web page
-//     })
-// });
-
-
-/*************************************************************/
-/* rerun scans when the report is changed                    */
+/* RELOAD web page when the report code changes              */
 const watchReport = new Watch('./src-report/public/build.js')
 watchReport.on('all', function (evt, filepath) {
   console.log('Report has changed, reload browsers')
@@ -298,16 +302,21 @@ watchReport.on('all', function (evt, filepath) {
 /*************************************************************/
 /* INITIAL SCAN of tests folders                             */
 function scanAllProjects() {
-  const filenames = fs.readdirSync('public')
-  const prDirectories = glob.sync('public/*/pr-*')
+  if (!fs.existsSync('public')) {
+    console.log('./public/ does not exist')
+    fs.mkdirSync('public')
+  }
+  const prDirectories = glob.sync('public/*/!(before|mask)*/')
+  if (prDirectories.length === 0) return Promise.resolve()
+  console.log(prDirectories);
   return Promise.map(prDirectories, dir => {
     dir = dir.split(path.sep)
-    const match   = dir[1].match(/[\w_]+/g)
-    const project = match[0]
-    const suite   = match[1]
-    const prId    = dir[2] // TODO : parseInt ?
-    // console.log('\nscanAllProjects', project, suite, prId)
-    return scanPr(project, suite, prId, false)
+    const match     = dir[1].match(/[\w_]+/g)
+    const projectId = match[0]
+    const suiteId   = match[1]
+    const prId      = dir[2]
+    // console.log('\nscanAllProjects', projectId, suiteId, prId)
+    return scanPr(projectId, suiteId, prId, false)
   }, {concurrency:4})
 }
 
@@ -331,29 +340,31 @@ function scanSuite(projectId, suiteId, force){
 /* SCAN A PR DIRECTORY and compare images to produce reports */
 function scanPr(projectId, suiteId, prId, force) {
   const prPath     = `public/${projectId}-${suiteId}/${prId}/`
-  const compPath   = `public/${projectId}-${suiteId}/${prId}/comparison-description.json`
+  const compPath   = `public/${projectId}-${suiteId}/${prId}/comparison-result.json`
   var   comparison = {}
   var   test
-  console.log('\nSCAN PR', prPath);
+  console.log('SCAN PR', `project:${projectId}  -  suite:${suiteId}  -  PR:${prId}`);
   if (!force && fs.existsSync(compPath)) {
     comparison = JSON.parse(fs.readFileSync(compPath, 'utf8'))
   }
-  suiteDescription = JSON.parse(fs.readFileSync(`public/${projectId}-${suiteId}/suite-description.json`, 'utf8'))
+  const suiteDescription = JSON.parse(fs.readFileSync(`public/${projectId}-${suiteId}/suite-description.json`, 'utf8'))
   // check if the comparison has already been done (test and comparison must have the same beforeVersion)
   // if not, then run a comparison
   if (force || (comparison.beforeVersion != suiteDescription.beforeVersion) ) {
-    return visualCompare(projectId, suiteId, prId, suiteDescription.beforeVersion)
+    return visualCompare(suiteDescription, prId)
     .then((compResult)=>{
       const addedComp = {
-        projectId                           ,
-        suiteId                             ,
-        prId                                ,
-        hasFailed  : compResult.hasFailed   ,
-        hasNew     : compResult.hasNew      ,
-        hasDeleted : compResult.hasDeleted  ,
-        hasPassed  : compResult.hasPassed   ,
-        title      : suiteDescription.title ,
-        date       : compResult.date        ,
+        projectId                                  ,
+        suiteId                                    ,
+        prId                                       ,
+        projectName : suiteDescription.projectName ,
+        suiteName   : suiteDescription.suiteName   ,
+        title       : suiteDescription.title       ,
+        hasFailed   : compResult.hasFailed         ,
+        hasNew      : compResult.hasNew            ,
+        hasDeleted  : compResult.hasDeleted        ,
+        hasPassed   : compResult.hasPassed         ,
+        date        : compResult.date              ,
       }
       addComparison(projectId, suiteId, prId, addedComp)
       return addedComp
@@ -361,17 +372,19 @@ function scanPr(projectId, suiteId, prId, force) {
 
   }else{
     // add or update the test to the list
-    console.log(`${projectId}-${suiteId}-${prId} : comparison (SANS scan) => comparison.hasFailed`, comparison.hasFailed);
+    // console.log(`${projectId}-${suiteId}-${prId} : comparison (SANS scan)`, comparison.hasFailed);
     const addedComp = {
-      projectId                           ,
-      suiteId                             ,
-      prId                                ,
-      hasFailed  : comparison.hasFailed   ,
-      hasNew     : comparison.hasNew      ,
-      hasDeleted : comparison.hasDeleted  ,
-      hasPassed  : comparison.hasPassed   ,
-      date       : comparison.date        ,
-      title      : suiteDescription.title ,
+      projectId                                  ,
+      suiteId                                    ,
+      prId                                       ,
+      projectName : suiteDescription.projectName ,
+      suiteName   : suiteDescription.suiteName   ,
+      title       : suiteDescription.title       ,
+      hasFailed   : comparison.hasFailed         ,
+      hasNew      : comparison.hasNew            ,
+      hasDeleted  : comparison.hasDeleted        ,
+      hasPassed   : comparison.hasPassed         ,
+      date        : comparison.date              ,
     }
     addComparison(projectId, suiteId, prId, addedComp)
     return addedComp // TODO : not sure that that we should return a resolved promise instead of a value...
@@ -379,10 +392,10 @@ function scanPr(projectId, suiteId, prId, force) {
 }
 
 
-/*************************************************************/
-/*  */
+/*******************************************************************/
+/* INSERT or UPDATE a COMPARISON in the comparisonsDictionnary     */
 function addComparison (projectId, suiteId, prId, comp) {
-  console.log('addComparison', projectId, suiteId, prId);
+  // console.log('\naddComparison', projectId, suiteId, prId, comp);
   var existingPro, existingSuite
   existingPro = comparisonsDictionnary[projectId]
   if (!existingPro){
@@ -391,6 +404,7 @@ function addComparison (projectId, suiteId, prId, comp) {
     comparisonsDictionnary[projectId] = existingPro
     existingPro[suiteId]=existingSuite
     existingSuite[prId]=comp
+    comparisonsDictionnaryByPr[prId]=comp
     return comp
   }
   existingSuite = existingPro[suiteId]
@@ -398,10 +412,64 @@ function addComparison (projectId, suiteId, prId, comp) {
     existingSuite = {}
     existingPro[suiteId] = existingSuite
     existingSuite[prId]=comp
+    comparisonsDictionnaryByPr[prId]=comp
     return comp
   }
   existingSuite[prId] = comp
+  comparisonsDictionnaryByPr[prId]=comp
   return comp
+}
+
+
+/********************************************************************/
+/* If necessary creates the project and suite, then                 */
+/* creates a new run id                                             */
+/* id patern : {projectId}-{suiteId}-{random string of 9 caracters} */
+function checkAndCreateRun(projectName, suiteName){
+  const projectId = shorthash(projectName)
+  const suiteId   = shorthash(suiteName)
+
+  // 1) update comparisonsDictionnary
+  var prId
+  // project doesn't exists
+  if (!comparisonsDictionnary[projectId]) {
+    comparisonsDictionnary[projectId] = {}
+    comparisonsDictionnary[projectId][suiteId]={}
+    prId = `pr-${projectId}-${suiteId}-${Math.random().toString(36).substring(2, 11)}`
+  // suite doesn't exists
+  }else if (!comparisonsDictionnary[projectId][suiteId]) {
+    comparisonsDictionnary[projectId][suiteId]={}
+    prId = `pr-${projectId}-${suiteId}-${Math.random().toString(36).substring(2, 11)}`
+  // project doesn't exists
+  }else{
+    prId = `pr-${projectId}-${suiteId}-${Math.random().toString(36).substring(2, 11)}`
+    while (comparisonsDictionnary[projectId][suiteId][prId]) {  // test the prId doesn't exists
+      prId = `pr-${projectId}-${suiteId}-${Math.random().toString(36).substring(2, 11)}`
+    }
+  }
+  comparisonsDictionnaryByPr[prId] = {
+    projectId,
+    suiteId,
+    prId,
+    projectName,
+    suiteName,
+  }
+
+  // 2) create directories
+  fs.mkdirSync(`public/${projectId}-${suiteId}/${prId}/after`, {recursive: true})
+  fs.mkdirSync(`public/${projectId}-${suiteId}/${prId}/diff` )
+  if (!fs.existsSync(`public/${projectId}-${suiteId}/before`)) fs.mkdirSync(`public/${projectId}-${suiteId}/before`)
+  if (!fs.existsSync(`public/${projectId}-${suiteId}/mask`  )) fs.mkdirSync(`public/${projectId}-${suiteId}/mask`  )
+  if (!fs.existsSync(`public/${projectId}-${suiteId}/suite-description.json`  )) {
+    const description = {
+      projectId,
+      suiteId,
+      projectName,
+      suiteName,
+    }
+    fs.writeFileSync(`public/${projectId}-${suiteId}/suite-description.json`, JSON.stringify(description))
+  }
+  return prId
 }
 
 
@@ -441,15 +509,6 @@ function computeMaskedImage(filePath, masks){
 
 /*************************************************************/
 /* HELPERS                                                   */
-function checkAndCreateRun(projectId, suiteId){
-  if (!comparisonsDictionnary[projectId]) {
-
-  }
-}
-
-
-/*************************************************************/
-/* HELPERS                                                   */
 function checkAndCreateDir(path) {
   if (!fs.existsSync(path)) {
     fs.mkdirSync(path)
@@ -459,11 +518,10 @@ function checkAndCreateDir(path) {
 
 /*************************************************************/
 /* START server when all directories are re scanned          */
-server.listen(PORT);
-console.log('Hi! Cozy visual tests dashboard is running on http://localhost:'.magenta + PORT);
 scanAllProjects().then(()=>{
-  console.log('\n___all promises fullfiled')
-  // console.log('comparisonsDictionnary')
+  console.log('__all scans terminated')
+  server.listen(PORT);
+  console.log('\nHi! Cozy visual tests dashboard is running on http://localhost:'.magenta + PORT)
   // console.log(JSON.stringify(comparisonsDictionnary, null, 2))
   reloadBrowser.reload(); // Fire server-side reload event when all the scans are done.
 })

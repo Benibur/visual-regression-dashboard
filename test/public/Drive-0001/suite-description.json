@@ -1,6 +1,8 @@
 {
     "projectId": "Drive",
     "suiteId": "0001",
+    "projectName": "The Drive project",
+    "suiteName": "Deletion of a folder 1 and a much longer description in order to see what it look likes when it's very long,  and a much longer description in order to see what it look likes when it's very long",
     "beforeVersion": 2,
     "title": "Directory 1 creation in a folder with many other folders"
 }

@@ -1,6 +1,8 @@
 {
     "projectId": "Drive",
     "suiteId": "0003",
+    "projectName": "The Drive project",
+    "suiteName": "Deletion of a folder 3",
     "beforeVersion": 2,
     "title": "Directory 3 creation in a folder with many other folders"
 }

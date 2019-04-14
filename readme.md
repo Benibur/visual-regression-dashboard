@@ -2,9 +2,10 @@
 
 ## What is this ?
 This is a node.js server providing :
-- a dashboard of a set of visual regression tests
-- an efficient report of a test with the ability to validate in a click a screenshot as the new reference.
-- a simple and robust solution for sending the screenshots
+- a dashboard of a set of visual regression tests pushed on the server from some testCafe tests.
+- for each test a  report with the ability :
+  - to validate in a click a screenshot as the new reference
+  - to add masks to the screenshot to ignore parts of the image during comparisons
 
 ## Install
 
@@ -20,78 +21,43 @@ yarn server:dev # http://localhost:8080
 yarn server:dev PORT=XXXX # port can be specified
 ```
 ### For production
-* Modify the listening port (in `./src-server/server.js )`
+* The server thread must be allowed to write in `./public/`, that's there that all the data are stored (screenshots, parameters...)
 * node-canvas install (here for Ubuntu/Debian)[https://github.com/Automattic/node-canvas/wiki/Installation:-Ubuntu-and-other-Debian-based-systems]
 ```shell
 yarn
-yarn mkdir public
-yarn server # http://localhost:8080 or add PORT=XXXX in the CLI
+yarn server PORT=XXX # http://localhost:XXXX
 ```
+
 
 ### Notes on Fabricjs
 Fabricjs is a javascript library for image editing. On nodejs it uses node-canvas and there are some caveat regardings dependencies versions. It has been tested ok with `node 10.15.3`, `fabricjs ^2.7.0`, `"jsdom": "^13.2.0"` (jsdom version seems important)
 
+
 ## How to add visual tests & screenshots
 
-### Data structure
-- All the data are in the `./public` directory.
-- There is a folder for each visual test
-- A test is defined by 3 parameters :
-  - `appId` - the tested application ID - ex: "Drive" (could contain a version number or a release tag)
-  - `seq` : the id of the sequence test for an app. Ex: "0004"
-  - `runId` - ex: "run-0003" - the runId is modified each time a test is run and some of the screenshots are added or updated. It is used to check if a visual comparison must be triggered.
-- the `testId` is the concatenation of `[appID]-[seq]`  ex: "Drive-0004"
-- the folder name of a tests is the `testId` (aka :`[appId]-[seq]`) (there is no folder for each run of a test, only the last one)
-- in a test folder there is :
-  - `after/` : contains the screenshots of the last run
-  - `before/` : contains the reference screenshots (with same filename as in the `after/` directory)
-  - `test-description.json` : a file with the test parameters
-- `test-description.json` contains :
-```JSON
-{
-    "testId": "Drive-0002",
-    "appId": "Drive",
-    "seq": "0002",
-    "runId": "run-005",
-    "title": "directory 2 creation in a folder with many other folders"
-}
-```
-### How to init
-- you are in charge of creating & deleting the test directory (filename = `[appID]-[seq]` )
-- and in this directory you create
-  - the `after` directory with your screenshots
-  - the `test-description.json` with the correct data
-- then you can start the server (`yarn `)
-
-### How to update
-- you can delete and create tests folders
-- you can add/remove/update screenshots in `after/` directory
-- and when you finished the updates, you can create or update `test-description.json` (in case of an update you are likely to just modify the runId)
-
-This is the update of this file wich will trigger the run of the visual comparison.
-All those operations can be done live, but for the init, if you have a lot of tests you don't want to re-run, it is better to init and then start the server (concurrency limits are manage only during server initialisation, this could be improved, be re-running tests seems the easiest solution)
-
-**To push those modifications on the server** the easiest way is to store the screenshots local on the machine where tests are run. Those would be stored in the same directory structure. And when tests are done, run a synchronisation with a tool such as rsync. This synchronisation can be done in two steps : first the screenshots (`/after`) and then the `test-description.json` file.
+### Create a PR
+TO BE COMPLETED
 
 
 ## Development
 
 ### Code structure
-The service is composed of 3 mains parts :
+The service is composed of 4 mains parts :
 1. the nodejs server (expressjs) : `./src-server/server.js`
-2. the dashboard web page, a simple page made of jade templates in `./src-dashboard/main.js` and served from `./src-dashboard/public`
-3. the test report, a vue.js application in `./src-server/report`, built and pushed in `./public/[]-[]/index.html`
+2. the comparison scripts : `./src-compare`
+3. the dashboard web page, a simple page made of jade templates in `./src-dashboard/main.js` and served from `./src-dashboard/public`
+4. the test report, a vue.js application in `./src-server/src`, built and pushed in `./src-server/public`
 
 
 ### All the commands :
 ```bash
-yarn server          # starts the server
-yarn server:dev      # start server in watch mode
-yarn report:build    # builds the report
-yarn report:dev      # builds the report in watch mode
-yanr dashboard:build # builds the dashboard
-yanr dashboard:dev   # builds the dashboard in watch mode
-yarn test:init       # copy ./test/public in ./public
+yarn server [PORT=xxx] # starts the server [optionnal : precise port]
+yarn server:dev        # start server in watch mode
+yarn report:build      # builds the report
+yarn report:dev        # builds the report in watch mode
+yanr dashboard:build   # builds the dashboard
+yanr dashboard:dev     # builds the dashboard in watch mode
+yarn test:init         # copy ./test/public in ./public
 ```
 
 ### Typical development workflow
@@ -104,21 +70,76 @@ yarn dashboar:dev
 # in another shell
 yarn server:dev
 # now let's code
-# and from time to time re initi process : kill your server and :
+# and from time to time re init the process : kill your server and
 yarn test:init
 #  repeat as many times as you want :-)
-
+yarn test:init && yarn server:dev
+#  repeat as many times as you want :-)
 ```
 
+### Data structure
+- All the data are in the `./public` directory.
+- There is a folder for each "suite", ie an expected serie of screenshots
+- for each Suite, there a several PR, each having their screenshots to be compared to reference screenshots of the suite.
+- A test is defined by 3 parameters :
+  - `projectId` - the tested application ID - ex: "Drive" (could contain a version number or a release tag)
+  - `suiteId` - the id of the sequence test for an app. Ex: "0004"
+  - `prId` - unique id of the test.
+- the path to a test is `[projectId]-[suiteId]/[prId]`.
+- in the suite directory there are :
+  - `before/` : the expected screenshts as they were before the PR (with same filename as in the `after/` directory)
+  - `mask/` : contains the definition of eventual masks for some of the `before` screenshots
+  - `suite-description.json` : the description of the suite `{projectId, suiteId, projectName, suiteName}`
+  - `prId/` : a directory for each PR to be tested
+- in a test folder there is :
+  - `after/` : contains the screenshots of the last run
+  - `diff/` : contains the differential images between `/before/` and `/after/`
+  - `comparison-result.json` : a file with the test parameters
+- `test-description.json` contains :
+```JSON
+{
+  "projectId"    : "Drive",
+  "suiteId"      : "0001",
+  "prId"         : "pr-001",
+  "projectName"  : "The Drive project",
+  "suiteName"    : "Deletion of a folder 1 and other actions",
+  "beforeVersion": 2,
+  "date"         : 1555250794322,
+  "type"         : "danger",
+  "hasPassed"    : true,
+  "hasFailed"    : true,
+  "hasNew"       : true,
+  "hasDeleted"   : true,
+  "newItems"     : [
+    {
+      "raw"      : "sample.03.png",    // same structure in all xxxItems arrays
+      "encoded"  : "sample.03.png",
+      "hasMask"  : false
+    }
+  ],
+  "deletedItems" : [],
+  "passedItems"  : [],
+  "failedItems"  : []
+}
+```
+
+## Note pour tests avec testcafe :
+- installation de chrome dans debian : https://blog.tfrichet.fr/installer-google-chrome-sur-debian-8-jessie/
+
+
 ### TODO
-* reload du dashboard
-* ouverture du dashboard
-* lien vers une comparaison
+* lien avec la pr : je suis pour avoir un lien vers les pr : on ne garde qu'un "run" par PR, on peut mettre le lien du test vers la PR dans github, et on peut tester le statut d'une pr (si fermée depuis longtemps : je supprime le test automatiquement)
+* route pour supprimer les run de PR. Attention, que doit on faire d'une suite quand il n'y a plus de pr ? faut il supprimer la suite, et donc ses masques et les screenshots validés ?
+* possibilité de mettre des paramètres de comparaison par image.
+* vérifier la manière dont est utilisé le champs beforeVersion : je pense qu'il n'est pas mis à jour lors d'un changement ni des éléments d'une PR, ni d'une suite. Utile au démarrage pour ne pas tout recomparer...
+* meilleure gestion des masques : centrer l'imag, la redimensionner, gérer un zoom
+* https
+* il y a un risque de surcharge si trop de requêtes sur le serveur : on pourrait ajouter une queue pour gérer les scanPr, il semble qu'il faudra choisir entre (qui s'appuient sur redis) :
+  - https://github.com/bee-queue/bee-queue
+  - https://github.com/OptimalBits/bull/blob/develop/REFERENCE.md
+  - ou bien une solution maison à base de debounce ??
+* dans le report, brancher la search en haut à droite (facile mais inutile)
 
-* route pour uploader des images
-* route pour uploader les metat data d'un runId
-* route pour récupérer le status d'un run ()
-* route pour supprimer les run de PR.
 
-### Credits
+## Credits
 * this code has been heavily re using reg-cli : https://github.com/reg-viz/reg-cli

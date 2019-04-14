@@ -5,7 +5,7 @@
   "description": "A dashboard of the visual tests of Cozy",
   "repository": {
     "type": "git",
-    "url": "https://github.com/benibur/visual-tests-dashboar"
+    "url": "https://github.com/benibur/visual-tests-dashboard"
   },
   "scripts": {
     "server": "node src-server/server.js",
@@ -36,7 +36,9 @@
     "make-dir": "^2.1.0",
     "md5-file": "^4.0.0",
     "moment": "^2.24.0",
-    "mustache": "^3.0.1",
+    "multer": "^1.4.1",
+    "qjobs": "^1.2.0",
+    "shorthash": "^0.0.2",
     "uglify-js": "^3.4.10",
     "uglifyjs-webpack-plugin": "^2.1.2",
     "url-loader": "^1.1.2",

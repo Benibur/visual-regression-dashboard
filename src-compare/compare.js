@@ -83,28 +83,26 @@ const extractFilesToCompare = (expectedDir) => {
 
 module.exports = (params) => {
   const {
-    actualDir,
-    expectedDir,
-    diffDir,
-    json,
-    project,
-    suite,
-    prId,
-    nextBeforeVersion,
-    report,
-    concurrency,
-    update,
-    urlPrefix,
-    threshold,
-    matchingThreshold,
-    thresholdRate,
-    thresholdPixel,
-    enableAntialias,
-    enableClientAdditionalDetection,
+    suiteDescription                ,
+    actualDir                       ,
+    expectedDir                     ,
+    diffDir                         ,
+    json                            ,
+    projectId                       ,
+    suiteId                         ,
+    prId                            ,
+    nextBeforeVersion               ,
+    concurrency                     ,
+    urlPrefix                       ,
+    threshold                       ,
+    matchingThreshold               ,
+    thresholdRate                   ,
+    thresholdPixel                  ,
+    enableAntialias                 ,
+    enableClientAdditionalDetection ,
   } = params;
   const dirs           = { actualDir, expectedDir, diffDir };
   const emitter        = new EventEmitter();
-  console.log(expectedDir);
   // get all png filenames
   const expectedFiles  = extractFilesToCompare(expectedDir) // exclude *.masked.png
   const expectedImages = extractItems(expectedDir)          // exclude files have a corresponding *.masked.png
@@ -133,31 +131,28 @@ module.exports = (params) => {
   })
     .then(result => aggregate(result))
     .then(({ passed, failed, diffItems }) => {
-      // console.log('\ncompare resulsts: ');
-      // console.log('passed', passed);
-      // console.log('failed', failed);
-      // console.log('diffItems', diffItems);
       return createReport({
-        projectId             : project,
-        suiteId               : suite,
-        prId                  : prId,
-        beforeVersion         : nextBeforeVersion,
-        date                  : Date.now(),
+        suiteDescription                                                               ,
+        projectId             : projectId                                              ,
+        suiteId               : suiteId                                                ,
+        prId                  : prId                                                   ,
+        beforeVersion         : nextBeforeVersion                                      ,
+        date                  : Date.now()                                             ,
         passedItems           : passed.map( item => item.replace(/\.masked\.png$/, '')),
         failedItems           : failed.map( item => item.replace(/\.masked\.png$/, '')),
-        diffItems             : diffItems,
-        newItems              : newImages,
-        deletedItems          : deletedImages,
-        expectedItems         : expectedImages,
-        previousExpectedImages: expectedImages,
-        actualItems           : actualImages,
-        json                  : json || './reg.json',
-        actualDir,
-        expectedDir,
-        diffDir,
-        report                : report    || '',
-        urlPrefix             : urlPrefix || '',
-        enableClientAdditionalDetection:  !!enableClientAdditionalDetection,
+        diffItems             : diffItems                                              ,
+        newItems              : newImages                                              ,
+        deletedItems          : deletedImages                                          ,
+        expectedItems         : expectedImages                                         ,
+        previousExpectedImages: expectedImages                                         ,
+        actualItems           : actualImages                                           ,
+        json                  : json                                                   ,
+        actualDir                                                                      ,
+        expectedDir                                                                    ,
+        diffDir                                                                        ,
+        report                : ''                                                     ,
+        urlPrefix             : ''                                                     ,
+        enableClientAdditionalDetection:  !!enableClientAdditionalDetection            ,
       });
     })
     .then(result => {
@@ -171,6 +166,5 @@ module.exports = (params) => {
     })
     .catch(err => emitter.emit('error', err))
 
-  // console.log(comp);
   return comp
 };

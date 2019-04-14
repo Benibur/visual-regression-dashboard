@@ -1,50 +1,62 @@
 <template>
   <div class="wrapper">
 
-      <div class="ui attached stackable menu">
-        <div class="ui fluid container">
-          <a class="item logo" href="/">
-            <img src="../assets/cozy-logo-name-horizontal-blue.svg" alt="Cozy">
-          </a>
-          <a class="item">
-            <i class="crosshairs icon"></i> Visual test of /{{projectId}}/{{suiteId}}/{{prId}}
-          </a>
+    <div class="ui attached stackable menu">
+      <div class="ui fluid container">
+        <a class="item logo" href="/">
+          <img src="../assets/cozy-logo-name-horizontal-blue.svg" alt="Cozy">
+        </a>
 
-          <div class="ui simple dropdown item" v-if="failedItems.length">
-            <i class="remove red icon"></i> Failed items ({{failedItems.length}})
-            <i class="dropdown icon"></i>
-            <item-summaries :title="'Failed items'" :icon="'remove'" :color="'red'" :items="failedItems">
-            </item-summaries>
-          </div>
+        <div class="ui simple dropdown item" v-if="failedItems.length">
+          <i class="remove red icon"></i> Failed items ({{failedItems.length}})
+          <i class="dropdown icon"></i>
+          <item-summaries :title="'Failed items'" :icon="'remove'" :color="'red'" :items="failedItems">
+          </item-summaries>
+        </div>
 
-          <div class="ui simple dropdown item" v-if="newItems.length">
-            <i class="file outline blue icon"></i> New items ({{newItems.length}})
-            <i class="dropdown icon"></i>
-            <item-summaries :title="'New items'" :icon="'file outline'" :color="'blue'" :items="newItems">
-            </item-summaries>
-          </div>
+        <div class="ui simple dropdown item" v-if="newItems.length">
+          <i class="file outline blue icon"></i> New items ({{newItems.length}})
+          <i class="dropdown icon"></i>
+          <item-summaries :title="'New items'" :icon="'file outline'" :color="'blue'" :items="newItems">
+          </item-summaries>
+        </div>
 
-          <div class="ui simple dropdown item" v-if="deletedItems.length">
-            <i class="trash outline icon"></i> Deleted items ({{deletedItems.length}})
-            <i class="dropdown icon"></i>
-            <item-summaries :title="'Deleted items'" :icon="'trash outline'" :color="'grey'" :items="deletedItems">
-            </item-summaries>
-          </div>
+        <div class="ui simple dropdown item" v-if="deletedItems.length">
+          <i class="trash outline icon"></i> Deleted items ({{deletedItems.length}})
+          <i class="dropdown icon"></i>
+          <item-summaries :title="'Deleted items'" :icon="'trash outline'" :color="'grey'" :items="deletedItems">
+          </item-summaries>
+        </div>
 
-          <div class="ui simple dropdown item" v-if="passedItems.length">
-            <i class="checkmark green icon"></i> Passed items ({{passedItems.length}})
-            <i class="dropdown icon"></i>
-            <item-summaries :title="'Passed items'" :icon="'checkmark'" :color="'green'" :items="passedItems">
-            </item-summaries>
-          </div>
+        <div class="ui simple dropdown item" v-if="passedItems.length">
+          <i class="checkmark green icon"></i> Passed items ({{passedItems.length}})
+          <i class="dropdown icon"></i>
+          <item-summaries :title="'Passed items'" :icon="'checkmark'" :color="'green'" :items="passedItems">
+          </item-summaries>
+        </div>
 
-          <div class="right item">
-            <div class="ui input"><input type="text" placeholder="Search..."></div>
-          </div>
+        <div class="right item">
+          <div class="ui input"><input type="text" placeholder="Search..."></div>
         </div>
       </div>
+    </div>
 
     <div class="content">
+
+      <table class="ui very compact table" id="comparison-description">
+        <tr>
+          <td>Project</td>
+          <td>{{projectName}}</td>
+        </tr>
+        <tr>
+          <td>Suite</td>
+          <td>{{suiteName}}</td>
+        </tr>
+        <tr>
+          <td>PR</td>
+          <td>{{prId}}</td>
+        </tr>
+      </table>
       <div class="not-found" v-if="isNotFound">
         <div>
           No screenshots
@@ -117,6 +129,8 @@ function initState () {
     projectId   : window['__reg__'].projectId                    ,
     suiteId     : window['__reg__'].suiteId                      ,
     prId        : window['__reg__'].prId                         ,
+    projectName : window['__reg__'].projectName                  ,
+    suiteName   : window['__reg__'].suiteName                    ,
     actualDir   : 'after'                                        ,
     expectedDir : 'before'                                       ,
     diffDir     : 'diff'                                         ,
@@ -329,6 +343,11 @@ export default {
 
 <style scoped src="./styles/common.css"></style>
 <style scoped>
+#comparison-description {
+  max-width: 55em;
+  margin-top: 24px;
+}
+
 .not-found {
   min-height: calc(100% - 80px);
   color: #aaa;

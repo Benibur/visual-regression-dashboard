@@ -57,16 +57,6 @@ export default {
       }
     },
   },
-  // mounted: function() {
-  //   console.log('mask modal mounted');
-  // },
-  // beforeUpdate: function() {
-  //   console.log('mask modal beforeUpdate');
-  // },
-  // updated: function() {
-  //   console.log('mask modal updated');
-  //   initFabricCanvas()
-  // },
   methods: {
     closeModal: function(event) {
       this.$modal.pop();

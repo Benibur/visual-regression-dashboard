@@ -1,6 +1,8 @@
 {
   "projectId": "Photo",
   "suiteId": "0001",
+  "projectName": "The Photo project",
+  "suiteName": "Deletion of a photo 1",
   "beforeVersion": 1,
   "title": "Photo album creation 1"
 }

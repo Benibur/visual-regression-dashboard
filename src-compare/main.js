@@ -38,27 +38,26 @@ const IMAGE_FILES = '/**/*.+(tiff|jpeg|jpg|gif|png|bmp)';
 //     },
 //   });
 
-function visualCompare(project, suite, prId, nextBeforeVersion) {
-  const prPath         = `public/${project}-${suite}/${prId}/`
-  const expectedDir    = `public/${project}-${suite}/before/`
-  const json           = prPath + 'comparison-description.json'
-  // const report         = prPath + 'index.html'
-  const actualDir      = prPath + 'after'
-  const diffDir        = prPath + 'diff'   // TODO tests diff directory exists
-  // const urlPrefix      =
-  console.log('visualCompare of :', prPath);
+function visualCompare(suiteDescription, prId) {
+  const {projectId, suiteId, projectName, suiteName} = suiteDescription
+  const nextBeforeVersion = suiteDescription.beforeVersion ? suiteDescription.beforeVersion : 1
+  const prPath            = `public/${projectId}-${suiteId}/${prId}/`
+  const expectedDir       = `public/${projectId}-${suiteId}/before/`
+  const json              = prPath + 'comparison-result.json'
+  const actualDir         = prPath + 'after'
+  const diffDir           = prPath + 'diff'
+  // console.log('start visualCompare of :', prPath)
 
-  // const observer = compare({
   return compare({
+    suiteDescription                            ,
     actualDir                                   ,
     expectedDir                                 ,
     diffDir                                     ,
     json                                        ,
-    project                                     ,
-    suite                                       ,
+    projectId                                   ,
+    suiteId                                     ,
     prId                                        ,
     nextBeforeVersion                           ,
-    // report                                      ,
     concurrency                     : 4         ,
     update                          : false     ,
     urlPrefix                       : './'      ,
@@ -67,7 +66,11 @@ function visualCompare(project, suite, prId, nextBeforeVersion) {
     thresholdPixel                  : Number(0) , // TODO  role ??
     enableAntialias                 : false     ,
     enableClientAdditionalDetection : false     ,
-  });
+  })
+  .then((res)=> {
+    // console.log('end visualCompare of :', prPath)
+    return res
+  })
 
 }
 

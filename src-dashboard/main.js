@@ -2,6 +2,7 @@ const projectTemplate   = require('./templates/project.pug' )
 const rowTemplate       = require('./templates/row.pug'     )
 const moment            = require('moment'                  )
 
+
 /*************************************************************/
 /*  GLOBALS                                                  */
 const resultsViewCtrler = {}
@@ -12,14 +13,15 @@ var   STORE //  sotre of data, a dictionnary of comparisons {projectId.suiteId.p
 
 moment.locale('fr');
 
+
 /*************************************************************/
 /* GET FROM SERVER THE LIST OF TESTS                         */
-
 req.onreadystatechange = function(event) {
     // XMLHttpRequest.DONE === 4
     if (this.readyState === XMLHttpRequest.DONE) {
         if (this.status === 200) {
             STORE = JSON.parse(this.responseText)
+            console.log(JSON.stringify(STORE, null, 2));
             resultsViewCtrler.init()
         } else {
             console.log("Status de la réponse: %d (%s)", this.status, this.statusText);
@@ -34,18 +36,9 @@ req.send(null);
 /*  VIEW CONTROLER INIT                                      */
 resultsViewCtrler.init = ()=>{
   console.log('resultsViewCtrler.init()');
-  // create apps views
-  for (var projectId in STORE) {
-    var project = STORE[projectId]
-    var newDiv = document.createElement("div")
-    newDiv.innerHTML = projectTemplate({appName:projectId})
-    project.view = newDiv
-    resultsContainerV.appendChild(newDiv)
-  }
   // create comparison rows views
   for (var projectId in STORE) {
     var project = STORE[projectId]
-    tableBody = project.view.getElementsByTagName('tbody')[0]
     var projectRows = []
     for (var suiteId in project) {
       if (suiteId === 'view') continue
@@ -65,7 +58,17 @@ resultsViewCtrler.init = ()=>{
       }
     }
     sortRows(projectRows)
-    projectRows.map(row => tableBody.appendChild(row.view))
+    // check project has some rows
+    if (projectRows.length === 0) continue
+    // create project view
+    console.log('create project :', {projectName: projectRows[0].projectName});
+    var projectDiv = document.createElement("div")
+    projectDiv.innerHTML = projectTemplate({projectName: projectRows[0].projectName})
+    project.view = projectDiv
+    resultsContainerV.appendChild(projectDiv)
+    // insert project rows
+    tableBody = projectDiv.getElementsByTagName('tbody')[0]
+    projectRows.forEach(row => tableBody.appendChild(row.view))
   }
 }
 
@@ -78,6 +81,7 @@ function sortRows(rows) {
 
 
 goToReport = (comparison) => {
+  if (comparison.hasPassed === undefined) return // in case there is no screenshots yet
   return (event) => {
     if (event.ctrlKey) {
       window.open(`/report/${comparison.projectId}/${comparison.suiteId}/${comparison.prId}/index.html`)
@@ -144,7 +148,6 @@ resultsViewCtrler.refreshRow = (comp) =>{
   comparison.view.innerHTML = rowTemplate(comp)
 
 }
-
 
 
 /*************************************************************/

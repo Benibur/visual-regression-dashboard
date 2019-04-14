@@ -36,8 +36,8 @@ xhr.onreadystatechange = function (event) {
 
 
       new Vue({
-        el: '#app',
-        render: h => h(App),
+        el     : '#app',
+        render : h => h(App),
       });
 
       const ximgdiffConfig = window['__reg__'].ximgdiffConfig || { enabled: false };
