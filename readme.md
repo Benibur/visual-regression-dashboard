@@ -10,8 +10,8 @@ This is a node.js server providing :
 ## Install
 
 ### Prerequisites
-* node-canvas has some specific prerequisites, (here for Ubuntu/Debian)[https://github.com/Automattic/node-canvas/wiki/Installation:-Ubuntu-and-other-Debian-based-systems]
 * node, yarn, webpack (installed globally)
+* node-canvas has some specific prerequisites, [here for Ubuntu/Debian](https://github.com/Automattic/node-canvas/wiki/Installation:-Ubuntu-and-other-Debian-based-systems)
 
 ###  For development and demo
 ```shell
@@ -22,7 +22,6 @@ yarn server:dev PORT=XXXX # port can be specified
 ```
 ### For production
 * The server thread must be allowed to write in `./public/`, that's there that all the data are stored (screenshots, parameters...)
-* node-canvas install (here for Ubuntu/Debian)[https://github.com/Automattic/node-canvas/wiki/Installation:-Ubuntu-and-other-Debian-based-systems]
 ```shell
 yarn
 yarn server PORT=XXXX # http://localhost:XXXX
