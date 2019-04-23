@@ -23,7 +23,7 @@ yarn server:dev PORT=XXXX # port can be specified
 ### For production
 * The server thread must be allowed to write in `./public/`, that's there that all the data are stored (screenshots, parameters...)
 ```shell
-yarn install --ignore-scripts
+yarn install --ignore-scripts # --ignore-scripts saves lives :-)
 yarn server PORT=XXXX # http://localhost:XXXX
 ```
 
